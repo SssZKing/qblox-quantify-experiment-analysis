@@ -48,4 +48,4 @@ from snl_qblox.pycqed_randomized_benchmarking.utils import randomized_benchmarki
 
 Raw data is not stored in this repository. Notebooks and scripts read the quantify data directory from the `QBLOX_DATADIR` environment variable, and fall back to `SNL315/CD1`. The Bell-state CSVs are expected in `SNL315/bell_state/`.
 
-`SNL315_plot.ipynb` imports `run_qpt_trials` from `SNL315/process_tomography/`, which is not included yet.
+`SNL315/process_tomography/run_qpt_series.py` imports `qpt_series`, which is not included yet.
