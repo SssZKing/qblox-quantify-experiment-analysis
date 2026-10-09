@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from quantify_scheduler.device_under_test.transmon_element import BasicTransmonElement
     from xarray import Dataset
 
-from qqea.schedules.single_qubit import (TWPA_DELAY, TWPA_RINGUP, TWPA_TAIL)
+from qqea.schedules.twpa import max_readout_duration, measure_with_twpa
 # iSWAP_DELAY = 38e-9
 iSWAP_DELAY = 120e-9
 # Extra idle after every iSWAP (and sqrt-iSWAP) before the next operation, on top of the
@@ -123,7 +123,7 @@ def randomized_benchmarking_schedule(
         qubits = [q for q in qubit_specifier]
 
     qubit_names = [qubit.name for qubit in qubits]
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
 
     n = len(qubit_names)
     if n not in (1, 2):
@@ -158,42 +158,32 @@ def randomized_benchmarking_schedule(
 
         # TODO: project before measuring if desired_net_clifford_index is not
         # common_cliffords["I"]
-        ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx))
-        marker_pulse = sched.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit_names[0] + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        measure_with_twpa(
+            sched,
+            *qubit_names,
+            readout_duration=readout_duration,
+            acq_index=acq_idx,
         )
 
     # Calibration points measured by preparing ground and excited states.
     sched.add(Reset(*qubit_names), label="Reset Cal 0")
-    ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx + 1), label="Calibration 0")
-    marker_pulse = sched.add(
-        MarkerPulse(
-            duration=marker_duration,
-            port=qubit_names[0] + ":switch",
-        ),
-        ref_op=ro_pulse,
-        ref_pt="start",
-        rel_time=TWPA_DELAY-TWPA_RINGUP,
+    measure_with_twpa(
+        sched,
+        *qubit_names,
+        readout_duration=readout_duration,
+        acq_index=acq_idx + 1,
+        label="Calibration 0",
     )
     
     reset_cal_1 = sched.add(Reset(*qubit_names), label="Reset Cal 1")
     for qubit_name in qubit_names:
         sched.add(X(qubit_name), ref_op=reset_cal_1, rel_time=0)
-    ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx + 2), label="Calibration 1")
-    marker_pulse = sched.add(
-        MarkerPulse(
-            duration=marker_duration,
-            port=qubit_names[0] + ":switch",
-        ),
-        ref_op=ro_pulse,
-        ref_pt="start",
-        rel_time=TWPA_DELAY-TWPA_RINGUP,
+    measure_with_twpa(
+        sched,
+        *qubit_names,
+        readout_duration=readout_duration,
+        acq_index=acq_idx + 2,
+        label="Calibration 1",
     )
 
     sched.add(IdlePulse(duration=4e-9))
@@ -250,7 +240,7 @@ def simultaneous_randomized_benchmarking_schedule(
         qubits = [q for q in qubit_specifier]
 
     qubit_names = [qubit.name for qubit in qubits]
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
 
     n = len(qubit_names)
     if n != 2:
@@ -289,42 +279,32 @@ def simultaneous_randomized_benchmarking_schedule(
 
         # TODO: project before measuring if desired_net_clifford_index is not
         # common_cliffords["I"]
-        ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx))
-        marker_pulse = sched.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit_names[0] + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        measure_with_twpa(
+            sched,
+            *qubit_names,
+            readout_duration=readout_duration,
+            acq_index=acq_idx,
         )
 
     # Calibration points measured by preparing ground and excited states.
     sched.add(Reset(*qubit_names), label="Reset Cal 0")
-    ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx + 1), label="Calibration 0")
-    marker_pulse = sched.add(
-        MarkerPulse(
-            duration=marker_duration,
-            port=qubit_names[0] + ":switch",
-        ),
-        ref_op=ro_pulse,
-        ref_pt="start",
-        rel_time=TWPA_DELAY-TWPA_RINGUP,
+    measure_with_twpa(
+        sched,
+        *qubit_names,
+        readout_duration=readout_duration,
+        acq_index=acq_idx + 1,
+        label="Calibration 0",
     )
     
     reset_cal_1 = sched.add(Reset(*qubit_names), label="Reset Cal 1")
     for qubit_name in qubit_names:
         sched.add(X(qubit_name), ref_op=reset_cal_1, rel_time=0)
-    ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx + 2), label="Calibration 1")
-    marker_pulse = sched.add(
-        MarkerPulse(
-            duration=marker_duration,
-            port=qubit_names[0] + ":switch",
-        ),
-        ref_op=ro_pulse,
-        ref_pt="start",
-        rel_time=TWPA_DELAY-TWPA_RINGUP,
+    measure_with_twpa(
+        sched,
+        *qubit_names,
+        readout_duration=readout_duration,
+        acq_index=acq_idx + 2,
+        label="Calibration 1",
     )
 
     sched.add(IdlePulse(duration=4e-9))
@@ -358,7 +338,7 @@ def iswap_pulsed_pump_schedule(
         qubits = [q for q in qubit_specifier]
 
     qubit_names = [qubit.name for qubit in qubits]
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
 
     n = len(qubit_names)
     if n not in (1, 2):
@@ -386,15 +366,12 @@ def iswap_pulsed_pump_schedule(
 
         # TODO: project before measuring if desired_net_clifford_index is not
         # common_cliffords["I"]
-        ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx, acq_protocol=acq_protocol))
-        marker_pulse = sched.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit_names[0] + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        measure_with_twpa(
+            sched,
+            *qubit_names,
+            readout_duration=readout_duration,
+            acq_index=acq_idx,
+            acq_protocol=acq_protocol,
         )
 
     sched.add(IdlePulse(duration=4e-9))
@@ -435,7 +412,7 @@ def iswap_tail_1q_schedule(
         raise ValueError("iswap_tail_1q_schedule requires two qubits.")
     if not pump and reference_duration is None:
         raise ValueError("pump=False needs reference_duration (26 ns + iSWAP pulse duration).")
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
     operation_buffer_time = MIN_TIME_BETWEEN_OPERATIONS * 4e-9
 
     sched = Schedule("iSWAP tail on 1Q gates", repetitions=repetitions)
@@ -451,10 +428,12 @@ def iswap_tail_1q_schedule(
             if gap > 0:
                 sched.add(IdlePulse(duration=gap))
             sched.add(index_to_operation(qubit_names, operation_buffer_time, clifford_gate_idx=75))
-        ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx, acq_protocol=acq_protocol))
-        sched.add(
-            MarkerPulse(duration=marker_duration, port=qubit_names[0] + ":switch"),
-            ref_op=ro_pulse, ref_pt="start", rel_time=TWPA_DELAY - TWPA_RINGUP,
+        measure_with_twpa(
+            sched,
+            *qubit_names,
+            readout_duration=readout_duration,
+            acq_index=acq_idx,
+            acq_protocol=acq_protocol,
         )
     sched.add(IdlePulse(duration=4e-9))
     return sched
@@ -500,7 +479,7 @@ def pump_probe_ramsey_schedule(
         if x < 0 or abs(round(x / 4e-9) * 4e-9 - x) > 1e-12:
             raise ValueError("delays, window and pump_duration must be >= 0 and on the 4 ns grid.")
     q = qubit_names[probe]
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
     sched = Schedule("Pump-probe Ramsey on " + q, repetitions=repetitions)
     for acq_idx, delay in enumerate(delays):
         qubit_reset = sched.add(Reset(*qubit_names))
@@ -517,10 +496,12 @@ def pump_probe_ramsey_schedule(
         if window > 0:
             sched.add(IdlePulse(duration=window))
         sched.add(Rxy(theta=90, phi=0 if final_axis == "x" else 90, qubit=q))
-        ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx, acq_protocol=acq_protocol))
-        sched.add(
-            MarkerPulse(duration=marker_duration, port=qubit_names[0] + ":switch"),
-            ref_op=ro_pulse, ref_pt="start", rel_time=TWPA_DELAY - TWPA_RINGUP,
+        measure_with_twpa(
+            sched,
+            *qubit_names,
+            readout_duration=readout_duration,
+            acq_index=acq_idx,
+            acq_protocol=acq_protocol,
         )
     sched.add(IdlePulse(duration=4e-9))
     return sched
@@ -565,7 +546,7 @@ def pump_probe_swap_schedule(
     for x in list(durations) + [pre_duration, gap]:
         if x < 0 or abs(round(x / 4e-9) * 4e-9 - x) > 1e-12:
             raise ValueError("durations, pre_duration and gap must be >= 0 and on the 4 ns grid.")
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
     sched = Schedule("Pump-probe swap", repetitions=repetitions)
 
     def _pump(duration):
@@ -589,10 +570,12 @@ def pump_probe_swap_schedule(
             sched.add(Rxy(theta=180, phi=0, qubit=qubit_names[excite]))
         if dur > 0:
             _pump(dur)
-        ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx, acq_protocol=acq_protocol))
-        sched.add(
-            MarkerPulse(duration=marker_duration, port=qubit_names[0] + ":switch"),
-            ref_op=ro_pulse, ref_pt="start", rel_time=TWPA_DELAY - TWPA_RINGUP,
+        measure_with_twpa(
+            sched,
+            *qubit_names,
+            readout_duration=readout_duration,
+            acq_index=acq_idx,
+            acq_protocol=acq_protocol,
         )
     sched.add(IdlePulse(duration=4e-9))
     return sched
@@ -620,7 +603,7 @@ def iswap_virtual_z_schedule(
         qubits = [q for q in qubit_specifier]
 
     qubit_names = [qubit.name for qubit in qubits]
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
 
     n = len(qubit_names)
     if n not in (1, 2):
@@ -657,15 +640,12 @@ def iswap_virtual_z_schedule(
 
         # sched.add(IdlePulse(duration=400e-9))
 
-        ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx, acq_protocol=acq_protocol))
-        marker_pulse = sched.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit_names[0] + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        measure_with_twpa(
+            sched,
+            *qubit_names,
+            readout_duration=readout_duration,
+            acq_index=acq_idx,
+            acq_protocol=acq_protocol,
         )
 
     sched.add(IdlePulse(duration=4e-9))
@@ -985,7 +965,7 @@ def iswap_RPE_f(
         qubits = [q for q in qubit_specifier]
 
     qubit_names = [qubit.name for qubit in qubits]
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
 
     n = len(qubit_names)
     if n not in (1, 2):
@@ -1023,15 +1003,12 @@ def iswap_RPE_f(
 
             sched.add(index_to_operation(qubit_names, operation_buffer_time, clifford_gate_idx=final_clifford))
 
-            ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx, acq_protocol=acq_protocol))
-            sched.add(
-                MarkerPulse(
-                    duration=marker_duration,
-                    port=qubit_names[0] + ":switch",
-                ),
-                ref_op=ro_pulse,
-                ref_pt="start",
-                rel_time=TWPA_DELAY-TWPA_RINGUP,
+            measure_with_twpa(
+                sched,
+                *qubit_names,
+                readout_duration=readout_duration,
+                acq_index=acq_idx,
+                acq_protocol=acq_protocol,
             )
 
         sched.add(IdlePulse(duration=4e-9))
@@ -1142,7 +1119,7 @@ def iswap_RPE_theta_sum(
         qubits = [q for q in qubit_specifier]
 
     qubit_names = [qubit.name for qubit in qubits]
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
 
     n = len(qubit_names)
     if n != 2:
@@ -1182,15 +1159,12 @@ def iswap_RPE_theta_sum(
                 sched.add(IdlePulse(duration=train_padding))
             sched.add(index_to_operation(qubit_names, operation_buffer_time, clifford_gate_idx=final_clifford))
 
-            ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx, acq_protocol=acq_protocol))
-            sched.add(
-                MarkerPulse(
-                    duration=marker_duration,
-                    port=qubit_names[0] + ":switch",
-                ),
-                ref_op=ro_pulse,
-                ref_pt="start",
-                rel_time=TWPA_DELAY-TWPA_RINGUP,
+            measure_with_twpa(
+                sched,
+                *qubit_names,
+                readout_duration=readout_duration,
+                acq_index=acq_idx,
+                acq_protocol=acq_protocol,
             )
 
         sched.add(IdlePulse(duration=4e-9))
@@ -1275,7 +1249,7 @@ def iswap_RPE_d(
         qubits = [q for q in qubit_specifier]
 
     qubit_names = [qubit.name for qubit in qubits]
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
 
     n = len(qubit_names)
     if n not in (1, 2):
@@ -1311,15 +1285,12 @@ def iswap_RPE_d(
             sched.add(MarkerPulse(duration=sqrt_iswap_duration, port="snail:switch"), rel_time=26e-9-iSWAP_DELAY)
             sched.add(IdlePulse(duration=iSWAP_DELAY + ISWAP_SETTLE))
 
-            ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx, acq_protocol=acq_protocol))
-            marker_pulse = sched.add(
-                MarkerPulse(
-                    duration=marker_duration,
-                    port=qubit_names[0] + ":switch",
-                ),
-                ref_op=ro_pulse,
-                ref_pt="start",
-                rel_time=TWPA_DELAY-TWPA_RINGUP,
+            measure_with_twpa(
+                sched,
+                *qubit_names,
+                readout_duration=readout_duration,
+                acq_index=acq_idx,
+                acq_protocol=acq_protocol,
             )
 
         sched.add(IdlePulse(duration=4e-9))
@@ -1380,7 +1351,7 @@ def iswap_delay_schedule(
         qubits = [q for q in qubit_specifier]
 
     qubit_names = [qubit.name for qubit in qubits]
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
 
     n = len(qubit_names)
     if n not in (1, 2):
@@ -1401,16 +1372,15 @@ def iswap_delay_schedule(
         swap_pulse = sched.add(gate_sched, ref_op=first_pulse, ref_pt="end", rel_time=delay-120e-9)
 
         # sched.add(index_to_operation(qubit_names, operation_buffer_time, clifford_gate_idx=gate_idx))
-        ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx, acq_protocol=acq_protocol),
-            ref_op=swap_pulse, ref_pt="end", rel_time=0)
-        marker_pulse = sched.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit_names[0] + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        measure_with_twpa(
+            sched,
+            *qubit_names,
+            readout_duration=readout_duration,
+            acq_index=acq_idx,
+            acq_protocol=acq_protocol,
+            ref_op=swap_pulse,
+            ref_pt="end",
+            rel_time=0,
         )
 
     sched.add(IdlePulse(duration=4e-9))
@@ -1895,7 +1865,7 @@ def _tomo_setup(qubit_specifier, operation_state_idx, warmup_iswaps=0, warmup_ga
     if n == 1 and warmup_iswaps:
         raise ValueError("warmup_iswaps requires two qubits.")
 
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
     # two-qubit RB needs buffer time for phase corrections on drive lines
     operation_buffer_time = [0.0, MIN_TIME_BETWEEN_OPERATIONS * 4e-9][n - 1]
 
@@ -1923,7 +1893,7 @@ def _tomo_setup(qubit_specifier, operation_state_idx, warmup_iswaps=0, warmup_ga
         "qubits": qubits,
         "qubit_names": qubit_names,
         "n": n,
-        "marker_duration": marker_duration,
+        "readout_duration": readout_duration,
         "operation_buffer_time": operation_buffer_time,
         "single_qubit_block": single_qubit_block,
         "tomo_sequence": tomo_sequence,
@@ -2008,15 +1978,13 @@ def _tomo_build(cfg, operation_state_idx, acq_protocol, bin_mode, repetitions,
         if gate_sched is not None:
             sched.add(gate_sched)
 
-        ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx, acq_protocol=acq_protocol, bin_mode=bin_mode))
-        sched.add(
-            MarkerPulse(
-                duration=cfg["marker_duration"],
-                port=qubit_names[0] + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        measure_with_twpa(
+            sched,
+            *qubit_names,
+            readout_duration=cfg["readout_duration"],
+            acq_index=acq_idx,
+            acq_protocol=acq_protocol,
+            bin_mode=bin_mode,
         )
 
     sched.add(IdlePulse(duration=4e-9))
@@ -2233,7 +2201,7 @@ def _qpt_setup(qubit_specifier, operation_state_idx, experiment_list, identity_r
     if n not in (1, 2):
         raise ValueError("Only single and two-qubit tomography supported.")
 
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
     # two-qubit RB needs buffer time for phase corrections on drive lines
     operation_buffer_time = [0.0, MIN_TIME_BETWEEN_OPERATIONS * 4e-9][n - 1]
 
@@ -2281,7 +2249,7 @@ def _qpt_setup(qubit_specifier, operation_state_idx, experiment_list, identity_r
         "qubits": qubits,
         "qubit_names": qubit_names,
         "n": n,
-        "marker_duration": marker_duration,
+        "readout_duration": readout_duration,
         "operation_buffer_time": operation_buffer_time,
         "tomo_sequence": tomo_sequence,
         "single_qubit_block": single_qubit_block,
@@ -2349,15 +2317,13 @@ def _qpt_build(cfg, operation_state_idx, identity_reference, acq_protocol,
 
         _add_rotation(sched, tomo_sequence[meas_idx])
 
-        ro_pulse = sched.add(Measure(*qubit_names, acq_index=acq_idx, acq_protocol=acq_protocol, bin_mode=bin_mode))
-        sched.add(
-            MarkerPulse(
-                duration=cfg["marker_duration"],
-                port=qubit_names[0] + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        measure_with_twpa(
+            sched,
+            *qubit_names,
+            readout_duration=cfg["readout_duration"],
+            acq_index=acq_idx,
+            acq_protocol=acq_protocol,
+            bin_mode=bin_mode,
         )
 
     sched.add(IdlePulse(duration=4e-9))
@@ -2857,7 +2823,7 @@ def _gst_setup(qubit_specifier, experiment_list):
     if n not in (1, 2):
         raise ValueError("Only single and two-qubit GST supported.")
 
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
     operation_buffer_time = [0.0, MIN_TIME_BETWEEN_OPERATIONS * 4e-9][n - 1]
 
     # "I"-gate pulse duration -- same derivation as process tomography's
@@ -2876,7 +2842,7 @@ def _gst_setup(qubit_specifier, experiment_list):
         "qubits": qubits,
         "qubit_names": qubit_names,
         "n": n,
-        "marker_duration": marker_duration,
+        "readout_duration": readout_duration,
         "operation_buffer_time": operation_buffer_time,
         "idle_duration": idle_duration,
         "experiment_list": experiment_list,
@@ -2921,22 +2887,13 @@ def _gst_build(cfg, acq_protocol, bin_mode, repetitions, iswap_phases=None):
         if operation_sched is not None:
             sched.add(operation_sched)
 
-        ro_pulse = sched.add(
-            Measure(
-                *qubit_names,
-                acq_index=acq_idx,
-                acq_protocol=acq_protocol,
-                bin_mode=bin_mode,
-            )
-        )
-        sched.add(
-            MarkerPulse(
-                duration=cfg["marker_duration"],
-                port=qubit_names[0] + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY - TWPA_RINGUP,
+        measure_with_twpa(
+            sched,
+            *qubit_names,
+            readout_duration=cfg["readout_duration"],
+            acq_index=acq_idx,
+            acq_protocol=acq_protocol,
+            bin_mode=bin_mode,
         )
 
     sched.add(IdlePulse(duration=4e-9))

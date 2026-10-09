@@ -23,11 +23,15 @@ from quantify_scheduler.operations.shared_native_library import SpectroscopyOper
 from quantify_scheduler.resources import ClockResource
 from quantify_scheduler.schedules.schedule import Schedule
 
-from qqea.experiments.hp83732b import HP83732B
+from qqea.schedules.twpa import (
+    TWPA_DELAY,
+    TWPA_RINGUP,
+    TWPA_TAIL,
+    add_twpa_marker,
+    max_readout_duration,
+    measure_with_twpa,
+)
 
-TWPA_DELAY = -36e-9
-TWPA_RINGUP = 960e-9
-TWPA_TAIL = 40e-9
 STARK_LEAD = 10e-6  # Stark tone turns on this long before the end of Reset
 
 # e-f guassian pulse
@@ -99,15 +103,7 @@ def time_of_flight_calibration(
         rel_time=time_of_flight
     )
 
-    marker_pulse = schedule.add(
-        MarkerPulse(
-            duration=pulse_duration+TWPA_RINGUP+TWPA_TAIL, 
-            port=port[:-3] + "switch",
-        ),
-        ref_op=spec_pulse,
-        ref_pt="start",
-        rel_time=TWPA_delay-TWPA_RINGUP,
-    )
+    add_twpa_marker(schedule, spec_pulse, port[:-3] + "switch", pulse_duration, delay=TWPA_delay)
 
     schedule.add(IdlePulse(duration=4e-9))
 
@@ -171,14 +167,11 @@ def sweep_optimal_TWPA(
             label=f"acquisition {i})",
         )
 
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=integration_time+TWPA_RINGUP+TWPA_TAIL, 
-                port=port[:-3] + "switch",
-            ),
-            ref_op=spec_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        add_twpa_marker(
+            schedule,
+            spec_pulse,
+            port[:-3] + "switch",
+            integration_time,
             label=f"TWPA_mark {i})",
         )
 
@@ -238,14 +231,11 @@ def heterodyne_spec_sched_nco_TWPA(
             label=f"acquisition {i})",
         )
 
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=integration_time+TWPA_RINGUP+TWPA_TAIL, 
-                port=port[:-3] + "switch",
-            ),
-            ref_op=spec_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        add_twpa_marker(
+            schedule,
+            spec_pulse,
+            port[:-3] + "switch",
+            integration_time,
             label=f"TWPA_mark {i})",
         )
 
@@ -395,15 +385,7 @@ def multiplexed_heterodyne_spec_sched_nco_TWPA(
             )
 
             if acq_channel == 0:
-                marker_pulse = schedule.add(
-                    MarkerPulse(
-                        duration=integration_time+TWPA_RINGUP+TWPA_TAIL, 
-                        port=ports[0][:-3] + "switch",
-                    ),
-                    ref_op=spec_pulse,
-                    ref_pt="start",
-                    rel_time=TWPA_DELAY-TWPA_RINGUP,
-                )
+                add_twpa_marker(schedule, spec_pulse, ports[0][:-3] + "switch", integration_time)
     
                 schedule.add(IdlePulse(duration=4e-9))
         
@@ -481,14 +463,11 @@ def two_tone_spec_sched_nco_TWPA(
             label=f"acquisition {i}",
         )
 
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=ro_integration_time+TWPA_RINGUP+TWPA_TAIL, 
-                port=ro_pulse_port[:-3] + "switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        add_twpa_marker(
+            schedule,
+            ro_pulse,
+            ro_pulse_port[:-3] + "switch",
+            ro_integration_time,
             label=f"TWPA_mark {i})",
         )
 
@@ -508,7 +487,7 @@ def multiplexed_two_tone_spec_sched_nco_TWPA(
     repetitions: int = 1,
 ) -> Schedule:
 
-    marker_duration = qubits[0].measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubits[0].measure.pulse_duration()
     acquisition_delay = qubits[0].measure.acq_delay()
     qubits = [qubit.name for qubit in qubits]
     spec_ports = [f"{qubit}:mw" for qubit in qubits]
@@ -565,14 +544,11 @@ def multiplexed_two_tone_spec_sched_nco_TWPA(
             )
 
             if acq_channel == 0:
-                marker_pulse = schedule.add(
-                    MarkerPulse(
-                        duration=marker_duration, 
-                        port=qubits[acq_channel] + ":switch",
-                    ),
-                    ref_op=ro_pulse,
-                    ref_pt="start",
-                    rel_time=TWPA_DELAY-TWPA_RINGUP,
+                add_twpa_marker(
+                    schedule,
+                    ro_pulse,
+                    qubits[acq_channel] + ":switch",
+                    readout_duration,
                 )
     
                 schedule.add(IdlePulse(duration=4e-9))
@@ -589,7 +565,7 @@ def rabi_sched_TWPA(
     repetitions: int = 1,
 ) -> Schedule:
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     
     # ensure pulse_amplitude and pulse_duration are iterable.
@@ -634,17 +610,13 @@ def rabi_sched_TWPA(
         )
 
         # N.B. acq_channel is not specified
-        ro_pulse = schedule.add(Measure(qubit, acq_index=i), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_index=i,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -662,7 +634,7 @@ def rabi_amplification_TWPA(
     repetitions: int = 1,
 ) -> Schedule:
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     
     # ensure pulse_amplitude and pulse_duration are iterable.
@@ -708,17 +680,13 @@ def rabi_amplification_TWPA(
             )
 
         # N.B. acq_channel is not specified
-        ro_pulse = schedule.add(Measure(qubit, acq_index=i), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_index=i,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -735,7 +703,7 @@ def ramsey_sched_TWPA(
     repetitions: int = 1,
 ) -> Schedule:
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     
     # ensure times is an iterable when passing floats.
@@ -767,17 +735,14 @@ def ramsey_sched_TWPA(
         schedule.add(
             Rxy(theta=90, phi=recovery_phase, qubit=qubit), ref_pt="start", rel_time=tau
         )
-        ro_pulse = schedule.add(Measure(qubit, acq_index=i, acq_protocol=acq_protocol), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_index=i,
+            acq_protocol=acq_protocol,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -856,7 +821,7 @@ def stark_ramsey_sched_TWPA(
     ``times`` are start-to-start delays as in ``ramsey_sched_TWPA``.
     """
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     if qubit.reset.duration() < STARK_LEAD:
         raise ValueError(
             f"reset.duration ({qubit.reset.duration()}) must be >= STARK_LEAD ({STARK_LEAD})"
@@ -884,14 +849,11 @@ def stark_ramsey_sched_TWPA(
             schedule, qubit, reset, ro_pulse, stark_amp, stark_freq, label=f"{i}"
         )
 
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        add_twpa_marker(
+            schedule,
+            ro_pulse,
+            qubit + ":switch",
+            readout_duration,
             label=f"TWPA_mark {i})",
         )
 
@@ -911,7 +873,7 @@ def coupled_ramsey_sched_TWPA(
     repetitions: int = 1,
 ) -> Schedule:
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     qubit_c = qubit_c.name
     
@@ -947,17 +909,14 @@ def coupled_ramsey_sched_TWPA(
         #     rel_time=-38e-9,
         # )
 
-        ro_pulse = schedule.add(Measure(qubit, acq_index=i, acq_protocol=acq_protocol), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_index=i,
+            acq_protocol=acq_protocol,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -973,7 +932,7 @@ def coupled_phase_ramsey_sched_TWPA(
     repetitions: int = 1,
 ) -> Schedule:
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     qubit_c = qubit_c.name
     
@@ -1008,17 +967,13 @@ def coupled_phase_ramsey_sched_TWPA(
             rel_time=-38e-9,
         )
 
-        ro_pulse = schedule.add(Measure(qubit, acq_index=i), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_index=i,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -1034,7 +989,7 @@ def echo_sched_TWPA(
     ] = "SSBIntegrationComplex",
 ) -> Schedule:
     
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
 
     # ensure times is an iterable when passing floats.
@@ -1047,17 +1002,14 @@ def echo_sched_TWPA(
         schedule.add(X90(qubit))
         schedule.add(X(qubit), ref_pt="end", rel_time=tau / 2)
         schedule.add(X90(qubit), ref_pt="end", rel_time=tau / 2)
-        ro_pulse = schedule.add(Measure(qubit, acq_protocol=acq_protocol, acq_index=i), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_protocol=acq_protocol,
+            acq_index=i,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -1072,7 +1024,7 @@ def t1_sched_TWPA(
     ] = "SSBIntegrationComplex",
 ) -> Schedule:
     
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     
     # ensure times is an iterable when passing floats.
@@ -1084,22 +1036,16 @@ def t1_sched_TWPA(
         schedule.add(Reset(qubit), label=f"Reset {i}")
         schedule.add(X(qubit), label=f"pi {i}")
 
-        ro_pulse = schedule.add(
-            Measure(qubit, acq_index=i, acq_protocol=acq_protocol),
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_index=i,
+            acq_protocol=acq_protocol,
             ref_pt="end",
             rel_time=tau,
             label=f"Measurement {i}",
-        )
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -1116,7 +1062,7 @@ def t1_and_t2_TWPA(
     ] = "SSBIntegrationComplex",
 ) -> Schedule:
     
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     
     # ensure times is an iterable when passing floats.
@@ -1154,14 +1100,11 @@ def t1_and_t2_TWPA(
             )
             ro_pulse = schedule.add(Measure(qubit, acq_index=i, acq_protocol=acq_protocol), label=f"Measurement {i}")
 
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        add_twpa_marker(
+            schedule,
+            ro_pulse,
+            qubit + ":switch",
+            readout_duration,
             label=f"TWPA_mark {i})",
         )
 
@@ -1185,7 +1128,7 @@ def multi_qubit_t1_and_t2_TWPA(
         qubits = [q for q in qubit_specifier]
 
     qubit_names = [qubit.name for qubit in qubits]
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
     
     # ensure times is an iterable when passing floats.
     times = np.asarray(times)
@@ -1221,15 +1164,7 @@ def multi_qubit_t1_and_t2_TWPA(
                 )
                 ro_pulse = schedule.add(Measure(qubit, acq_index=i, acq_protocol=acq_protocol))
 
-            marker_pulse = schedule.add(
-                MarkerPulse(
-                    duration=marker_duration,
-                    port=qubit + ":switch",
-                ),
-                ref_op=ro_pulse,
-                ref_pt="start",
-                rel_time=TWPA_DELAY-TWPA_RINGUP,
-            )
+            add_twpa_marker(schedule, ro_pulse, qubit + ":switch", readout_duration)
 
             schedule.add(IdlePulse(duration=4e-9))
     return schedule
@@ -1243,7 +1178,7 @@ def multiplexed_readout_calibration_sched_TWPA(
     ] = "SSBIntegrationComplex",
 ) -> Schedule:
 
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
 
     qubit_names = [q.name for q in qubits]
     schedule = Schedule(f"Multiplexed readout calibration (TWPA)", repetitions)
@@ -1258,25 +1193,15 @@ def multiplexed_readout_calibration_sched_TWPA(
         else:
             raise ValueError(f"Prepared state ({prep_state}) must be either 0 or 1.")
             
-        ro_pulse = schedule.add(
-            Measure(
-                *qubit_names, acq_index=i, bin_mode=BinMode.APPEND, acq_protocol=acq_protocol
-            ),
+        measure_with_twpa(
+            schedule,
+            *qubit_names,
+            readout_duration=readout_duration,
+            acq_index=i,
+            bin_mode=BinMode.APPEND,
+            acq_protocol=acq_protocol,
             label=f"Measurement {i}",
-        )
-
-        # for qubit_name in qubit_names:
-        #     schedule.add(ResetClockPhase(clock=f"{qubit_name}.ro"), ref_op=ro_pulse, ref_pt="start", rel_time=-4e-9)
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit_names[0] + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -1291,7 +1216,7 @@ def readout_calibration_sched_TWPA(
     ] = "SSBIntegrationComplex",
 ) -> Schedule:
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     
     schedule = Schedule(f"Readout calibration {qubit}, {prepared_states}(TWPA)", repetitions)
@@ -1329,14 +1254,11 @@ def readout_calibration_sched_TWPA(
 
         schedule.add(ResetClockPhase(clock=f"{qubit}.ro"), ref_op=ro_pulse, ref_pt="start", rel_time=-4e-9)
 
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        add_twpa_marker(
+            schedule,
+            ro_pulse,
+            qubit + ":switch",
+            readout_duration,
             label=f"TWPA_mark {i})",
         )
 
@@ -1552,7 +1474,7 @@ def allxy_sched_TWPA(
     element_select_idx: Union[np.ndarray, int] = np.arange(21),
     repetitions: int = 1,
 ) -> Schedule:
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     
     element_idxs = np.asarray(element_select_idx)
@@ -1598,17 +1520,13 @@ def allxy_sched_TWPA(
         schedule.add(Reset(qubit), label=f"Reset {i}")
         schedule.add(Rxy(qubit=qubit, theta=th0, phi=phi0))
         schedule.add(Rxy(qubit=qubit, theta=th1, phi=phi1))
-        ro_pulse = schedule.add(Measure(qubit, acq_index=i), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_index=i,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -1762,7 +1680,7 @@ def f_state_spec_sched_nco_TWPA(
     repetitions: int = 1,
 ) -> Schedule:
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     
     schedule = Schedule("f state spectroscopy (NCO sweep)(TWPA)", repetitions)
@@ -1789,17 +1707,13 @@ def f_state_spec_sched_nco_TWPA(
             label=f"spec_pulse {i}",
         )
         
-        ro_pulse = schedule.add(Measure(qubit, acq_index=i), label=f"Measurement {i}")
-        
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_index=i,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -1816,7 +1730,7 @@ def f_state_rabi_sched_TWPA(
     repetitions: int = 1,
 ) -> Schedule:
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     
     # ensure pulse_amplitude and pulse_duration are iterable.
@@ -1872,17 +1786,13 @@ def f_state_rabi_sched_TWPA(
         # )
         
         # N.B. acq_channel is not specified
-        ro_pulse = schedule.add(Measure(qubit, acq_index=i), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_index=i,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -2002,14 +1912,11 @@ def f_state_cavity_TWPA(
             label=f"acquisition {i})",
         )
 
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=integration_time+TWPA_RINGUP+TWPA_TAIL, 
-                port=port[:-3] + "switch",
-            ),
-            ref_op=spec_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        add_twpa_marker(
+            schedule,
+            spec_pulse,
+            port[:-3] + "switch",
+            integration_time,
             label=f"TWPA_mark {i})",
         )
 
@@ -2027,7 +1934,7 @@ def f_state_t1_TWPA(
     ] = "SSBIntegrationComplex",
 ) -> Schedule:
     
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     
     # ensure times is an iterable when passing floats.
@@ -2073,17 +1980,14 @@ def f_state_t1_TWPA(
             )
             schedule.add(X(qubit))
 
-        ro_pulse = schedule.add(Measure(qubit, acq_index=i, acq_protocol=acq_protocol), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_index=i,
+            acq_protocol=acq_protocol,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -2096,7 +2000,7 @@ def multiplex_IQ_TWPA(
     repetitions: int = 1,
 ) -> Schedule:
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     acquisition_delay = qubit.measure.acq_delay()
     pulse_duration = qubit.measure.pulse_duration()
     pulse_amp = qubit.measure.pulse_amp()
@@ -2159,14 +2063,12 @@ def multiplex_IQ_TWPA(
                 rel_time=acquisition_delay,
             )
 
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=prep,
+        add_twpa_marker(
+            schedule,
+            prep,
+            qubit + ":switch",
+            readout_duration,
             ref_pt="end",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
             label=f"TWPA_mark {i})",
         )
 
@@ -2182,7 +2084,7 @@ def RO_raw_trace_TWPA(
     repetitions: int = 1,
 ) -> Schedule:
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     acquisition_delay = qubit.measure.acq_delay()
     pulse_duration = qubit.measure.pulse_duration()
     pulse_amp = qubit.measure.pulse_amp()
@@ -2245,14 +2147,12 @@ def RO_raw_trace_TWPA(
             rel_time=acquisition_delay,
         )
 
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=prep,
+        add_twpa_marker(
+            schedule,
+            prep,
+            qubit + ":switch",
+            readout_duration,
             ref_pt="end",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
             label=f"TWPA_mark {i})",
         )
 
@@ -2270,7 +2170,7 @@ def rabi_population_TWPA(
     ] = "SSBIntegrationComplex",
 ) -> Schedule:
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     
     schedule = Schedule(f"Rabi Population Measurement(TWPA)", repetitions)
@@ -2328,17 +2228,13 @@ def rabi_population_TWPA(
         else:
             raise ValueError(f"Sequence case ({case}) must be either 1 or 2.")
             
-        ro_pulse = schedule.add(Measure(qubit, acq_index=i), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_index=i,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -2365,7 +2261,7 @@ def SNAIL_swap_sched_TWPA(
         qubits = [q for q in qubit_specifier]
 
     qubit_names = [qubit.name for qubit in qubits]
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
 
     qubit_e_names = [qubit.name for qubit in qubit_e]
 
@@ -2407,17 +2303,14 @@ def SNAIL_swap_sched_TWPA(
         
         schedule.add(IdlePulse(duration=100e-9))
         
-        ro_pulse = schedule.add(Measure(*qubit_names, acq_index=i, acq_protocol=acq_protocol), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit_names[0] + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            *qubit_names,
+            readout_duration=readout_duration,
+            acq_index=i,
+            acq_protocol=acq_protocol,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -2461,7 +2354,7 @@ def SNAIL_spec_sched_TWPA(
     repetitions: int = 1,
 ) -> Schedule:
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
 
     schedule = Schedule("signal generator spectroscopy (TWPA)", repetitions)
@@ -2477,17 +2370,13 @@ def SNAIL_spec_sched_TWPA(
                 port="snail:switch",
             ),)
         
-        ro_pulse = schedule.add(Measure(qubit, acq_index=i), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_index=i,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -2639,14 +2528,11 @@ def pump_heterodyne_spec_sched_nco_TWPA(
                 label=f"acquisition {i})",
             )
     
-            marker_pulse = schedule.add(
-                MarkerPulse(
-                    duration=integration_time+TWPA_RINGUP+TWPA_TAIL, 
-                    port=port[:-3] + "switch",
-                ),
-                ref_op=spec_pulse,
-                ref_pt="start",
-                rel_time=TWPA_DELAY-TWPA_RINGUP,
+            add_twpa_marker(
+                schedule,
+                spec_pulse,
+                port[:-3] + "switch",
+                integration_time,
                 label=f"TWPA_mark {i})",
             )
     
@@ -2671,7 +2557,7 @@ def pump_t1_sched_TWPA(
         qubits = [q for q in qubit_specifier]
 
     qubit_names = [qubit.name for qubit in qubits]
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
 
     qubit_e_names = [qubit.name for qubit in qubit_e]
     
@@ -2694,17 +2580,14 @@ def pump_t1_sched_TWPA(
         
         schedule.add(IdlePulse(duration=38e-9))
         
-        ro_pulse = schedule.add(Measure(*qubit_names, acq_index=i, acq_protocol=acq_protocol), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit_names[0] + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            *qubit_names,
+            readout_duration=readout_duration,
+            acq_index=i,
+            acq_protocol=acq_protocol,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -2729,7 +2612,7 @@ def pump_ramsey_sched_TWPA(
         qubits = [q for q in qubit_specifier]
 
     qubit_names = [qubit.name for qubit in qubits]
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
 
     qubit_e_names = [qubit.name for qubit in qubit_e]
     
@@ -2759,17 +2642,14 @@ def pump_ramsey_sched_TWPA(
                 Rxy(theta=90, phi=recovery_phase, qubit=qubit_e), ref_op=reset, ref_pt="end", rel_time=tau
             )
 
-        ro_pulse = schedule.add(Measure(*qubit_names, acq_index=i, acq_protocol=acq_protocol), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit_names[0] + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            *qubit_names,
+            readout_duration=readout_duration,
+            acq_index=i,
+            acq_protocol=acq_protocol,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -2794,7 +2674,7 @@ def pump_t1_and_t2_sched_TWPA(
         qubits = [q for q in qubit_specifier]
 
     qubit_names = [qubit.name for qubit in qubits]
-    marker_duration = max(qubit.measure.pulse_duration() for qubit in qubits) + TWPA_RINGUP + TWPA_TAIL
+    readout_duration = max_readout_duration(qubits)
 
     qubit_e_names = [qubit.name for qubit in qubit_e]
     
@@ -2842,14 +2722,11 @@ def pump_t1_and_t2_sched_TWPA(
 
             ro_pulse = schedule.add(Measure(qubit, acq_index=i, acq_protocol=acq_protocol), label=f"Measurement {i}")
 
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit_names[0] + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
+        add_twpa_marker(
+            schedule,
+            ro_pulse,
+            qubit_names[0] + ":switch",
+            readout_duration,
             label=f"TWPA_mark {i})",
         )
 
@@ -2871,7 +2748,7 @@ def pump_RPM_TWPA(
     ] = "SSBIntegrationComplex",
 ) -> Schedule:
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
 
     snail_drive.frequency(pump_frequency)
@@ -2921,17 +2798,13 @@ def pump_RPM_TWPA(
         else:
             raise ValueError(f"Sequence case ({case}) must be either 1 or 2.")
             
-        ro_pulse = schedule.add(Measure(qubit, acq_index=i), label=f"Measurement {i}")
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_index=i,
+            label=f"Measurement {i}",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
@@ -2951,7 +2824,7 @@ def cavity_charging_TWPA(
     ] = "SSBIntegrationComplex",
 ) -> Schedule:
 
-    marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
+    readout_duration = qubit.measure.pulse_duration()
     pi_duration = qubit.rxy.duration()
     qubit = qubit.name
     
@@ -2974,22 +2847,16 @@ def cavity_charging_TWPA(
         schedule.add(X(qubit), ref_op=charging_pulse, ref_pt="start", rel_time=init_duration, label=f"pi {i}")
         # schedule.add(X(qubit), ref_op=charging_pulse, ref_pt="end", rel_time=200e-9, label=f"pi {i}")
 
-        ro_pulse = schedule.add(
-            Measure(qubit, acq_index=i, acq_protocol=acq_protocol),
+        measure_with_twpa(
+            schedule,
+            qubit,
+            readout_duration=readout_duration,
+            acq_index=i,
+            acq_protocol=acq_protocol,
             ref_pt="end",
             rel_time=5e-6,
             label=f"Measurement {i}",
-        )
-
-        marker_pulse = schedule.add(
-            MarkerPulse(
-                duration=marker_duration,
-                port=qubit + ":switch",
-            ),
-            ref_op=ro_pulse,
-            ref_pt="start",
-            rel_time=TWPA_DELAY-TWPA_RINGUP,
-            label=f"TWPA_mark {i})",
+            marker_label=f"TWPA_mark {i})",
         )
 
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
