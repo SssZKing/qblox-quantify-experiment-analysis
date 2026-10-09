@@ -1,26 +1,25 @@
-from typing import Tuple
+"""lmfit models: beating Ramsey, double/triple Lorentzian and damped swap oscillation.
+
+Also holds shared instances of quantify-core's models (``exp_decay_model``,
+``decay_osci_model``, ``lorentzian_model``, ``resonator_model``) that the fits
+and notebooks reuse.
+"""
 
 import lmfit
 import numpy as np
 from numpy.typing import NDArray
-
-from quantify_core.analysis.single_qubit_timedomain import (
-    RabiAnalysis, 
-    RamseyAnalysis, 
-    T1Analysis,
-    EchoAnalysis,
-    AllXYAnalysis,
+from quantify_core.analysis.fitting_models import (
+    DecayOscillationModel,
+    ExpDecayModel,
+    LorentzianModel,
+    ResonatorModel,
 )
-from quantify_core.analysis.spectroscopy_analysis import (
-    ResonatorSpectroscopyAnalysis,
-    QubitSpectroscopyAnalysis,
-)
-from quantify_core.analysis.readout_calibration_analysis import (
-    ReadoutCalibrationAnalysis,
-)
-from quantify_core.analysis.base_analysis import Basic2DAnalysis
-from quantify_core.analysis.fitting_models import fft_freq_phase_guess
 from scipy.signal import hilbert
+
+resonator_model = ResonatorModel()
+lorentzian_model = LorentzianModel()
+exp_decay_model = ExpDecayModel()
+decay_osci_model = DecayOscillationModel()
 
 def two_tone_decay_func(
     t: float,
@@ -85,6 +84,9 @@ class BeatingDecayOscillationModel(lmfit.model.Model):
     r"""
     Model for a beating decaying oscillation which decays to a point with 0 offset from
     the centre of the of the oscillation (as in a Ramsey experiment, for example).
+
+    ``frequency_max`` (Hz) and ``tau_max`` (s) bound both frequencies and the decay
+    time; the defaults (500 kHz, 500 us) suit a Ramsey trace in seconds.
     """
 
     # pylint: disable=empty-docstring
@@ -92,18 +94,18 @@ class BeatingDecayOscillationModel(lmfit.model.Model):
     # pylint: disable=too-few-public-methods
 
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, frequency_max=500e3, tau_max=500e-6, **kwargs):
         # pass in the defining equation so the user doesn't have to later.
         super().__init__(two_tone_decay_func, *args, **kwargs)
 
         # Enforce oscillation frequency is positive
-        self.set_param_hint("frequency0", min=0, max=500e3)
-        self.set_param_hint("frequency1", min=0, max=500e3)
+        self.set_param_hint("frequency0", min=0, max=frequency_max)
+        self.set_param_hint("frequency1", min=0, max=frequency_max)
         # Enforce amplitude is positive
         self.set_param_hint("amplitude0", min=0)
         self.set_param_hint("amplitude1", min=0)
         # Enforce decay time is positive
-        self.set_param_hint("tau", min=0, max=500e-6)
+        self.set_param_hint("tau", min=0, max=tau_max)
 
     # pylint: disable=missing-function-docstring
 
@@ -113,7 +115,6 @@ class BeatingDecayOscillationModel(lmfit.model.Model):
             raise ValueError(
                 'Time variable "t" must be specified in order to guess parameters'
             )
-            return None
 
         amp_guess = abs(max(data) - min(data)) / 2  # amp is positive by convention
         exp_offs_guess = np.mean(data)
@@ -143,8 +144,17 @@ def double_lorentzian_func(
     a_: float,
     c: float,
 ) -> float:
-    
-    return a * width / (np.pi * ((x - x0) ** 2) + width**2) + a_ * width_ / (np.pi * ((x - x0_) ** 2) + width_**2) + c
+    """Sum of two Lorentzian peaks on an offset ``c``.
+
+    Each peak is ``a * width / (pi * ((x - x0)**2 + width**2))``: ``width`` is the
+    half width at half maximum and ``a`` the peak area, so the height is
+    ``a / (pi * width)``.
+    """
+    return (
+        a * width / (np.pi * ((x - x0) ** 2 + width**2))
+        + a_ * width_ / (np.pi * ((x - x0_) ** 2 + width_**2))
+        + c
+    )
     
 class DoubleLorentzianModel(lmfit.model.Model):
     def __init__(self, *args, **kwargs) -> None:
@@ -212,11 +222,12 @@ def triple_lorentzian_func(
     a__: float,
     c: float,
 ) -> float:
-
+    """Sum of three Lorentzian peaks on an offset ``c``; same peak form as
+    :func:`double_lorentzian_func` (``width`` = HWHM, ``a`` = area)."""
     return (
-        a * width / (np.pi * ((x - x0) ** 2) + width**2)
-        + a_ * width_ / (np.pi * ((x - x0_) ** 2) + width_**2)
-        + a__ * width__ / (np.pi * ((x - x0__) ** 2) + width__**2)
+        a * width / (np.pi * ((x - x0) ** 2 + width**2))
+        + a_ * width_ / (np.pi * ((x - x0_) ** 2 + width_**2))
+        + a__ * width__ / (np.pi * ((x - x0__) ** 2 + width__**2))
         + c
     )
 
