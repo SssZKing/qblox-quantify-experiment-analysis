@@ -11,6 +11,8 @@ import functools
 import warnings
 from datetime import datetime
 
+import numpy as np
+
 from qcodes import ManualParameter
 from quantify_scheduler.gettables import ScheduleGettable
 
@@ -145,6 +147,21 @@ class NodeBase:
             return None
         self._tuids.append(tuid)
         return tuid
+
+    @staticmethod
+    def _try_fit(fit_function, *args, **kwargs):
+        """Call a fit, returning None if it raises on unusable data.
+
+        The fits use ``curve_fit``/``lstsq``, which raise on NaN data or when
+        they don't converge; the node contract is to report that as a failed
+        fit, not to raise. Other exceptions (bugs) still propagate.
+        """
+        try:
+            return fit_function(*args, **kwargs)
+        except (ValueError, RuntimeError, np.linalg.LinAlgError) as exc:
+            print(f"{getattr(fit_function, '__name__', 'fit')} could not fit the data: "
+                  f"{type(exc).__name__}: {exc}")
+            return None
 
     # ------------------------------------------------------------------
     # state helpers

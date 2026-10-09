@@ -240,3 +240,25 @@ def test_run_roadmap_retries_then_stops_on_fail():
     assert calls == ["q1", "q1", "q2", "q2"]
     assert [(r["qubit"], r["ok"], r["attempts"]) for r in log] == [("q1", False, 2), ("q2", False, 2)]
     assert nodes.meas_ctrl.verbose() is True
+
+
+def test_a_fit_that_raises_on_bad_data_is_a_failed_node(monkeypatch):
+    # e.g. curve_fit on the NaN data a dummy cluster returns
+    class Raw:
+        attrs = {}
+
+        def copy(self):
+            return self
+
+    def nan_fit(ds, motzoi, plot):
+        raise ValueError("array must not contain infs or NaNs")
+
+    monkeypatch.setattr(single_qubit, "DRAG_calibration_sched", lambda **kw: Raw())
+    monkeypatch.setattr(single_qubit, "DRAG_fit", nan_fit)
+    monkeypatch.setattr(_base, "save_retrieve_acquisition_dataset", lambda ds, name: "TUID-2")
+    nodes = make_nodes(instrument_coordinator=object())
+    qubit = FakeQubit()
+
+    assert nodes.drag_calibration(qubit) == (False, None)
+    assert qubit.rxy.motzoi() == 0.03
+    assert nodes.history[-1]["ok"] is False and "error" not in nodes.history[-1]

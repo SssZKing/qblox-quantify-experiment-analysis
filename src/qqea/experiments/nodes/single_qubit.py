@@ -174,8 +174,8 @@ class SingleQubitNodes(NodeBase):
         finally:
             qubit.rxy.motzoi(prev_motzoi)
 
-        f01 = ramsey_chevron_fit(
-            ram_che_ds.tuid, qubit,
+        f01 = self._try_fit(
+            ramsey_chevron_fit, ram_che_ds.tuid, qubit,
             plot_data=plot_data, plot_fit=plot_fit, real_imag=True,
         )
 
@@ -306,7 +306,7 @@ class SingleQubitNodes(NodeBase):
             real_imag=True,
         )
 
-        amp180 = rabi_amplification_fit(rabi_amp_ds, plot=plot, real_imag=True)
+        amp180 = self._try_fit(rabi_amplification_fit, rabi_amp_ds, plot=plot, real_imag=True)
 
         if amp180 is None or not np.isfinite(amp180):
             print("Rabi amplification fit failed. Please check the data.")
@@ -607,7 +607,7 @@ class SingleQubitNodes(NodeBase):
         self._save_raw(drag_ds, f"{qubit.name} DRAG calibration",
                        motzoi_list=np.asarray(motzoi_list), repetitions=repetitions)
 
-        motzoi = DRAG_fit(drag_ds, motzoi_list, plot=plot)
+        motzoi = self._try_fit(DRAG_fit, drag_ds, motzoi_list, plot=plot)
 
         if motzoi is None or not np.isfinite(motzoi):
             print("DRAG fit failed. Please check the data.")

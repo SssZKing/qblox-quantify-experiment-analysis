@@ -97,7 +97,7 @@ class IswapStarkNodes(NodeBase):
                     f"{run_label} {'plus' if sign > 0 else 'minus'}", repetitions, soft_avg=1,
                     num_channels=len(qubits), max_batch_size=length_setpoints.size,
                 )
-                fit = rpe_rate_fit(ds, channel='y0', plot=plot)
+                fit = self._try_fit(rpe_rate_fit, ds, channel='y0', plot=plot)
                 if fit is None:
                     return base, None, None
                 mags[sign] = magnitude(fit['rate'])
@@ -331,12 +331,12 @@ class IswapStarkNodes(NodeBase):
         ds_sx, ds_sy = self._rpe_quadrature_pair(
             qubits, iswap_RPE_theta_sum, sum_length_setpoints, f"{name} Stark sum quadrature",
             repetitions, iswap_spacing=sum_spacing)
-        fit_s = rpe_quadrature_fit(ds_sx, ds_sy, psi_range=(90.0, 270.0), plot=plot)
+        fit_s = self._try_fit(rpe_quadrature_fit, ds_sx, ds_sy, psi_range=(90.0, 270.0), plot=plot)
 
         ds_fx, ds_fy = self._rpe_quadrature_pair(
             qubits, iswap_RPE_f, difference_length_setpoints, f"{name} Stark difference quadrature",
             repetitions)
-        fit_f = rpe_quadrature_fit(ds_fx, ds_fy, psi_range=(-180.0, 180.0), plot=plot)
+        fit_f = self._try_fit(rpe_quadrature_fit, ds_fx, ds_fy, psi_range=(-180.0, 180.0), plot=plot)
 
         if fit_s is None or fit_f is None:
             print('Stark phase quadrature: a fit was rejected. Edge not updated.')

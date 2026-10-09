@@ -250,7 +250,7 @@ class ReadoutNodes(NodeBase):
                        frequency_setpoints=np.asarray(frequency_setpoints),
                        repetitions=repetitions)
 
-        optimal_freq = RO_freq_fit(ro_freq_ds, frequency_setpoints, plot=plot)
+        optimal_freq = self._try_fit(RO_freq_fit, ro_freq_ds, frequency_setpoints, plot=plot)
 
         if optimal_freq is None or not np.isfinite(optimal_freq):
             print("RO frequency optimization failed. Please check the data.")
@@ -317,7 +317,7 @@ class ReadoutNodes(NodeBase):
         self._save_raw(ro_amp_ds, f"{qubit.name} RO amplitude optimization",
                        amp_setpoints=np.asarray(amp_setpoints), repetitions=repetitions)
 
-        optimal_amp = RO_amp_fit(ro_amp_ds, amp_setpoints, plot=plot)
+        optimal_amp = self._try_fit(RO_amp_fit, ro_amp_ds, amp_setpoints, plot=plot)
 
         if optimal_amp is None or not np.isfinite(optimal_amp):
             print("RO amplitude optimization failed. Please check the data.")
@@ -386,7 +386,7 @@ class ReadoutNodes(NodeBase):
         self._save_raw(ro_len_ds, f"{qubit.name} RO duration optimization",
                        len_setpoints=np.asarray(len_setpoints), repetitions=repetitions)
 
-        optimal_duration = RO_len_fit(ro_len_ds, len_setpoints, plot=plot)
+        optimal_duration = self._try_fit(RO_len_fit, ro_len_ds, len_setpoints, plot=plot)
 
         if optimal_duration is None or not np.isfinite(optimal_duration):
             print("RO duration optimization failed. Please check the data.")
@@ -459,8 +459,8 @@ class ReadoutNodes(NodeBase):
             self._save_raw(trace, f"{qubit.name} RO weight trace {state}",
                            prepared_state=state, repetitions=repetitions)
 
-        weights = readout_weight_extractor(
-            g_trace, e_trace, qubit, lo_freq,
+        weights = self._try_fit(
+            readout_weight_extractor, g_trace, e_trace, qubit, lo_freq,
             division_length=division_length, plot=plot,
         )
 
