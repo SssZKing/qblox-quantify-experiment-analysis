@@ -50,8 +50,10 @@ E2F_G_AMP = 0.28971234624362635
 # E2F_DURATION=400e-9
 # E2F_G_AMP=0.07048438715164222
 
-RESET_CHANNEL_0 = 4
-RESET_CHANNEL_1 = 5
+def _e2f_pulse(amp: float | None, duration: float | None) -> tuple[float, float]:
+    """e-f Gaussian pulse amplitude and duration, defaulting to E2F_G_AMP and E2F_DURATION."""
+    return (E2F_G_AMP if amp is None else amp, E2F_DURATION if duration is None else duration)
+
 
 def time_of_flight_calibration(
     port: str,
@@ -1214,7 +1216,10 @@ def readout_calibration_sched(
     acq_protocol: Literal[
         "SSBIntegrationComplex", "ThresholdedAcquisition", "NumericalSeparatedWeightedIntegration"
     ] = "SSBIntegrationComplex",
+    e2f_amp: float | None = None,
+    e2f_duration: float | None = None,
 ) -> Schedule:
+    e2f_amp, e2f_duration = _e2f_pulse(e2f_amp, e2f_duration)
 
     readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
@@ -1232,8 +1237,8 @@ def readout_calibration_sched(
             schedule.add(X(qubit))
             DRAG = schedule.add(
                 DRAGPulse(
-                    duration=E2F_DURATION,
-                    G_amp=E2F_G_AMP,
+                    duration=e2f_duration,
+                    G_amp=e2f_amp,
                     D_amp=0,
                     port=f"{qubit}:fs",
                     clock=f"{qubit}.12",
@@ -1856,7 +1861,10 @@ def f_state_cavity(
     init_duration: float = 10e-6,
     repetitions: int = 1,
     port_out: Optional[str] = None,
+    e2f_amp: float | None = None,
+    e2f_duration: float | None = None,
 ) -> Schedule:
+    e2f_amp, e2f_duration = _e2f_pulse(e2f_amp, e2f_duration)
     
     schedule = Schedule("Dressed f Cavity(TWPA)", repetitions)
     schedule.add_resource(ClockResource(name=clock, freq=frequencies.flat[0]))
@@ -1871,8 +1879,8 @@ def f_state_cavity(
         schedule.add(X(qubit))
         DRAG = schedule.add(
             DRAGPulse(
-                duration=E2F_DURATION,
-                G_amp=E2F_G_AMP,
+                duration=e2f_duration,
+                G_amp=e2f_amp,
                 D_amp=0,
                 port=f"{qubit}:fs",
                 clock=f"{qubit}.12",
@@ -1932,7 +1940,10 @@ def f_state_t1(
     acq_protocol: Literal[
         "SSBIntegrationComplex", "ThresholdedAcquisition", "NumericalSeparatedWeightedIntegration"
     ] = "SSBIntegrationComplex",
+    e2f_amp: float | None = None,
+    e2f_duration: float | None = None,
 ) -> Schedule:
+    e2f_amp, e2f_duration = _e2f_pulse(e2f_amp, e2f_duration)
     
     readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
@@ -1952,8 +1963,8 @@ def f_state_t1(
             schedule.add(X(qubit), label=f"pi {i}")
             DRAG = schedule.add(
                 DRAGPulse(
-                    duration=E2F_DURATION,
-                    G_amp=E2F_G_AMP,
+                    duration=e2f_duration,
+                    G_amp=e2f_amp,
                     D_amp=0,
                     port=f"{qubit}:fs",
                     clock=f"{qubit}.12",
@@ -1969,8 +1980,8 @@ def f_state_t1(
         if case == 2:
             DRAG = schedule.add(
                 DRAGPulse(
-                    duration=E2F_DURATION,
-                    G_amp=E2F_G_AMP,
+                    duration=e2f_duration,
+                    G_amp=e2f_amp,
                     D_amp=0,
                     port=f"{qubit}:fs",
                     clock=f"{qubit}.12",
@@ -1998,7 +2009,10 @@ def multiplex_IQ(
     prepared_states: List[int],
     multiplexing_freq: List[float],
     repetitions: int = 1,
+    e2f_amp: float | None = None,
+    e2f_duration: float | None = None,
 ) -> Schedule:
+    e2f_amp, e2f_duration = _e2f_pulse(e2f_amp, e2f_duration)
 
     readout_duration = qubit.measure.pulse_duration()
     acquisition_delay = qubit.measure.acq_delay()
@@ -2022,8 +2036,8 @@ def multiplex_IQ(
             schedule.add(X(qubit))
             DRAG = schedule.add(
                 DRAGPulse(
-                    duration=E2F_DURATION,
-                    G_amp=E2F_G_AMP,
+                    duration=e2f_duration,
+                    G_amp=e2f_amp,
                     D_amp=0,
                     port=f"{qubit}:fs",
                     clock=f"{qubit}.12",
@@ -2082,7 +2096,10 @@ def RO_raw_trace(
     prepared_states: List[int],
     multiplexing_freq: List[float],
     repetitions: int = 1,
+    e2f_amp: float | None = None,
+    e2f_duration: float | None = None,
 ) -> Schedule:
+    e2f_amp, e2f_duration = _e2f_pulse(e2f_amp, e2f_duration)
 
     readout_duration = qubit.measure.pulse_duration()
     acquisition_delay = qubit.measure.acq_delay()
@@ -2106,8 +2123,8 @@ def RO_raw_trace(
             schedule.add(X(qubit))
             DRAG = schedule.add(
                 DRAGPulse(
-                    duration=E2F_DURATION,
-                    G_amp=E2F_G_AMP,
+                    duration=e2f_duration,
+                    G_amp=e2f_amp,
                     D_amp=0,
                     port=f"{qubit}:fs",
                     clock=f"{qubit}.12",
@@ -2168,7 +2185,10 @@ def rabi_population(
     acq_protocol: Literal[
         "SSBIntegrationComplex", "ThresholdedAcquisition"
     ] = "SSBIntegrationComplex",
+    e2f_amp: float | None = None,
+    e2f_duration: float | None = None,
 ) -> Schedule:
+    e2f_amp, e2f_duration = _e2f_pulse(e2f_amp, e2f_duration)
 
     readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
@@ -2181,8 +2201,8 @@ def rabi_population(
         if case == 1:
             DRAG = schedule.add(
                 DRAGPulse(
-                    duration=E2F_DURATION,
-                    G_amp=E2F_G_AMP * angle/180,
+                    duration=e2f_duration,
+                    G_amp=e2f_amp * angle/180,
                     D_amp=0,
                     port=f"{qubit}:fs",
                     clock=f"{qubit}.12",
@@ -2205,8 +2225,8 @@ def rabi_population(
             schedule.add(X(qubit))
             DRAG = schedule.add(
                 DRAGPulse(
-                    duration=E2F_DURATION,
-                    G_amp=E2F_G_AMP * angle/180,
+                    duration=e2f_duration,
+                    G_amp=e2f_amp * angle/180,
                     D_amp=0,
                     port=f"{qubit}:fs",
                     clock=f"{qubit}.12",
@@ -2746,7 +2766,10 @@ def pump_RPM(
     acq_protocol: Literal[
         "SSBIntegrationComplex", "ThresholdedAcquisition"
     ] = "SSBIntegrationComplex",
+    e2f_amp: float | None = None,
+    e2f_duration: float | None = None,
 ) -> Schedule:
+    e2f_amp, e2f_duration = _e2f_pulse(e2f_amp, e2f_duration)
 
     readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
@@ -2769,8 +2792,8 @@ def pump_RPM(
         if case == 1:
             DRAG = schedule.add(
                 DRAGPulse(
-                    duration=E2F_DURATION,
-                    G_amp=E2F_G_AMP * angle/180,
+                    duration=e2f_duration,
+                    G_amp=e2f_amp * angle/180,
                     D_amp=0,
                     port=f"{qubit}:fs",
                     clock=f"{qubit}.12",
@@ -2784,8 +2807,8 @@ def pump_RPM(
             schedule.add(X(qubit))
             DRAG = schedule.add(
                 DRAGPulse(
-                    duration=E2F_DURATION,
-                    G_amp=E2F_G_AMP * angle/180,
+                    duration=e2f_duration,
+                    G_amp=e2f_amp * angle/180,
                     D_amp=0,
                     port=f"{qubit}:fs",
                     clock=f"{qubit}.12",

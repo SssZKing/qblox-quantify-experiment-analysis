@@ -20,7 +20,8 @@ iSWAP_DELAY = 120e-9
 # the sum Stark phase of the NEXT iSWAP with a ~20 ns time constant -- back-to-back iSWAPs
 # (26 ns RF gap) carry ~28 deg less sum phase per pair than iSWAPs >= ~100 ns apart, and a
 # train of them shows a ~25 deg one-time phase. 0 keeps the original timing; ~100e-9 makes
-# every iSWAP see the same (isolated) context. Read at call time, so it can be changed live.
+# every iSWAP see the same (isolated) context. Read at call time, so it can be changed live:
+# set qqea.schedules.gates.ISWAP_SETTLE (setting the name re-exported by two_qubit has no effect).
 ISWAP_SETTLE = 0.0
 
 
@@ -30,6 +31,7 @@ ISWAP_SETTLE = 0.0
 # with a software iSWAP_DELAY scan: >= 15 ns margin before, >= 40 ns after). Measured memory of
 # a pump pulse on the next iSWAP: 24 deg/pair with tau ~10 ns plus 10 deg/pair with tau ~80 ns;
 # 100 ns leaves ~2.9 deg/pair (~1.4 deg/gate).
+# Read at call time; change it live through qqea.schedules.gates.ISWAP_CONSECUTIVE_GAP.
 ISWAP_CONSECUTIVE_GAP = 100e-9
 
 
