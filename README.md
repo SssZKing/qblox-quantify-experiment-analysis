@@ -57,7 +57,8 @@ from qqea.schedules.twpa import set_twpa_pump
 set_twpa_pump(qubit2, False)
 ```
 
-The iSWAP edge now ships in the package: `from qqea.schedules.edges import CompositeiSWAPEdge`.
+
+Old imports map to new ones as follows:
 This is a layout-only migration. Each module was moved whole from the old Python-Packages folder, and only its imports were changed. Finer splits are done per subpackage.
 
 | Old import | New import |
