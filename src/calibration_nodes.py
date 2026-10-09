@@ -6,7 +6,7 @@ Each measurement/calibration routine ("node") is a method of
 (``ACQ_DELAY``) are held on the instance, so the notebook only needs to
 construct the object once::
 
-    from snl_qblox.calibration_nodes import CalibrationNodes
+    from calibration_nodes import CalibrationNodes
     nodes = CalibrationNodes(quantum_device, meas_ctrl, ACQ_DELAY, instrument_coordinator=ic)
     ok, fr = nodes.resonator_calibration(qubit1, amp=..., duration=...,
                                          freq_center=..., freq_span=...)
@@ -30,11 +30,11 @@ from quantify_scheduler.device_under_test.transmon_element import BasicTransmonE
 from quantify_core.analysis.spectroscopy_analysis import ResonatorSpectroscopyAnalysis
 from quantify_core.analysis.single_qubit_timedomain import RabiAnalysis, AllXYAnalysis
 from quantify_core.analysis.readout_calibration_analysis import ReadoutCalibrationAnalysis
-from .pycqed_randomized_benchmarking.utils import RBAnalysis, randomized_benchmarking_schedule
-from .pycqed_randomized_benchmarking.utils import iswap_RPE_f, iswap_RPE_theta_sum
+from pycqed_randomized_benchmarking.utils import RBAnalysis, randomized_benchmarking_schedule
+from pycqed_randomized_benchmarking.utils import iswap_RPE_f, iswap_RPE_theta_sum
 
-from .TWPA_schedule import *
-from .helpers import *
+from TWPA_schedule import *
+from helpers import *
 
 class CalibrationNodes:
     """Container for calibration nodes sharing the same runtime instruments."""

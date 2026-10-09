@@ -28,9 +28,19 @@ dependencies = [
 [project.optional-dependencies]
 notebooks = ["jupyter==1.1.1", "tqdm==4.66.2"]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools]
+package-dir = {"" = "src"}
+# Top-level modules, imported exactly as before: `from helpers import *`, `from TWPA_schedule import *`, ...
+py-modules = [
+    "HP83732B",
+    "TWPA_schedule",
+    "analyzer",
+    "calibration_nodes",
+    "helpers",
+    "simulated_data",
+    "tomography_tools",
+]
+packages = ["pycqed_randomized_benchmarking"]
 
 [tool.setuptools.package-data]
-snl_qblox = ["PMatrix2.pkl"]
-"snl_qblox.pycqed_randomized_benchmarking" = ["LICENSE.txt", "*.md", "clifford_hash_tables/*.txt"]
+pycqed_randomized_benchmarking = ["LICENSE.txt", "*.md", "clifford_hash_tables/*.txt"]

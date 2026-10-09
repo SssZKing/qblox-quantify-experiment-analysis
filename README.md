@@ -1,28 +1,21 @@
 # qblox-quantify-experiment-analysis
 
-Experiment schedules, calibration nodes and analysis tools for two-qubit transmon experiments on a Qblox cluster with quantify (device SNL315). It covers randomized benchmarking, state and process tomography, gate set tomography, and iSWAP incoherent-error studies.
+Python modules for running two-qubit transmon experiments on a Qblox cluster with quantify and analysing the results. They cover schedules, calibration nodes, fitting helpers, randomized benchmarking, state and process tomography, and gate set tomography.
 
-## Layout
+## Contents
 
 ```
-src/snl_qblox/                    installable package
+src/
     TWPA_schedule.py              quantify-scheduler schedules (with TWPA pump handling)
     calibration_nodes.py          CalibrationNodes: resonator/qubit/gate calibration routines
     helpers.py                    fitting and plotting helpers for quantify datasets
     analyzer.py                   extra lmfit models (beating decay, multi-Lorentzian, swap decay)
-    tomography_tools.py           state/process tomography, MLE, pyGSTi helpers
+    tomography_tools.py           state/process tomography, MLE, pyGSTi helpers (+ PMatrix2.pkl)
     simulated_data.py             simulated datasets for dry runs
     HP83732B.py                   qcodes driver for the HP 83732B signal generator
     pycqed_randomized_benchmarking/
                                   Clifford groups and RB, adapted from PycQED (MIT), extended
                                   for tomography, GST and iSWAP phase calibration
-SNL315/
-    SNL315.ipynb                  main measurement notebook
-    SNL315_plot.ipynb             analysis and paper figures
-    bell_state/                   Bell-state tomography analysis
-    process_tomography/           iSWAP process tomography analysis
-    gst/                          standalone GST analysis and reports
-    incoherent_error/             iSWAP incoherent error (T1/T2) simulation and fits
 ```
 
 ## Install
@@ -34,22 +27,27 @@ conda env create -f environment.yml
 conda activate qblox_dev
 ```
 
-Or, inside an existing env that already has the packages, install only this package:
+Or, inside an existing env that already has the packages, install only these modules:
 
 ```
 pip install -e . --no-deps
 ```
 
+Use the editable install (`-e`), because `tomography_tools` loads `PMatrix2.pkl` from the file next to it.
+
 The dependency versions in `pyproject.toml` are pinned to the ones in `qblox_env` (quantify-scheduler 0.23.1, quantify-core 0.9.1, qblox-instruments 0.16.0, qcodes 0.46.0, pygsti 0.9.14.3, qutip 5.0.2, numpy 1.26.4).
 
-Then import from the package, for example:
+## Usage
+
+The import names are the same as before, so notebook import lines don't change:
 
 ```python
-from snl_qblox.helpers import *
-from snl_qblox.calibration_nodes import CalibrationNodes
-from snl_qblox.pycqed_randomized_benchmarking.utils import randomized_benchmarking_schedule
+from helpers import *
+from TWPA_schedule import *
+from calibration_nodes import CalibrationNodes
+from tomography_tools import *
+from pycqed_randomized_benchmarking.utils import RBAnalysis, randomized_benchmarking_schedule
+import pycqed_randomized_benchmarking.utils as rbu
 ```
 
-## Data
-
-Raw data is not stored in this repository. Notebooks and scripts read the quantify data directory from the `QBLOX_DATADIR` environment variable, and fall back to `SNL315/CD1`. The Bell-state CSVs are expected in `SNL315/bell_state/`.
+Once the package is installed, the `sys.path.insert(0, 'C:/Users/1238Tech/Documents/Python-Packages')` line is no longer needed. If you leave that line in, the old Python-Packages folder takes precedence over the installed copy.

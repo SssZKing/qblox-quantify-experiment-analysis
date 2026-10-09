@@ -23,7 +23,7 @@ from quantify_scheduler.operations.shared_native_library import SpectroscopyOper
 from quantify_scheduler.resources import ClockResource
 from quantify_scheduler.schedules.schedule import Schedule
 
-from .HP83732B import HP83732B
+from HP83732B import HP83732B
 
 TWPA_DELAY = -36e-9
 TWPA_RINGUP = 960e-9

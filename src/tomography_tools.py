@@ -228,7 +228,7 @@ def T2t(T):
 ### Quantum Process Tomography (QPT) ###
 ##################################################
 
-PMATRIX_PATH = Path(__file__).with_name("PMatrix2.pkl")  # shipped with the package
+PMATRIX_PATH = Path(__file__).with_name("PMatrix2.pkl")  # ships next to this module
 
 with open(PMATRIX_PATH, "rb") as file:
     PMatrix = pickle.load(file)
