@@ -442,6 +442,21 @@ def _rows(schedule):
     return rows
 
 
+def _moved_runner(func):
+    """The DRAG and readout-optimization runners moved to qqea.experiments.runners
+    (the readout ones without their _TWPA suffix)."""
+    import importlib
+
+    try:
+        runners = importlib.import_module("qqea.experiments.runners")
+    except ImportError:
+        runners = None
+    fn = getattr(runners, func.removesuffix("_TWPA"), None)
+    if fn is None:
+        raise AttributeError(f"{func} is in neither qqea.schedules nor qqea.experiments.runners")
+    return fn
+
+
 def dump(src, out, snapshot, only):
     sys.path.insert(0, src)
     import importlib
@@ -468,7 +483,8 @@ def dump(src, out, snapshot, only):
         entry = {"function": f"{module}.{func}"}
         try:
             # The baseline predates the rename that dropped the _TWPA suffix.
-            fn = getattr(mod, func, None) or getattr(mod, func + "_TWPA")
+            fn = (getattr(mod, func, None) or getattr(mod, func + "_TWPA", None)
+                  or _moved_runner(func))
             value = fn(**make_kwargs(env))
             schedules = list(env["ic"].compiled)
             if isinstance(value, ScheduleBase):
