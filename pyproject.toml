@@ -7,25 +7,26 @@ name = "qblox-quantify-experiment-analysis"
 version = "0.1.0"
 description = "Qblox/quantify experiment schedules, calibration nodes and analysis tools (RB, state/process tomography, GST)"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.9"  # qblox_env runs 3.9.18
+# Pinned to the versions in the lab PC qblox_env (2026-10-09); see environment.yml for the full env.
 dependencies = [
-    "numpy",
-    "scipy",
-    "matplotlib",
-    "xarray",
-    "lmfit",
-    "qutip",
-    "pygsti",
-    "scikit-rf",
-    "qcodes",
-    "qblox-instruments",
-    "quantify-core",
-    "quantify-scheduler",
-    "typing_extensions",
+    "numpy==1.26.4",
+    "scipy==1.12.0",
+    "matplotlib==3.8.3",
+    "xarray==2024.2.0",
+    "lmfit==1.2.2",
+    "qutip==5.0.2",
+    "pygsti==0.9.14.3",
+    "scikit-rf==0.32.0",
+    "qcodes==0.46.0",
+    "qblox-instruments==0.16.0",
+    "quantify-core==0.9.1",
+    "quantify-scheduler==0.23.1",
+    "typing_extensions==4.15.0",
 ]
 
 [project.optional-dependencies]
-notebooks = ["jupyter", "tqdm"]
+notebooks = ["jupyter==1.1.1", "tqdm==4.66.2"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

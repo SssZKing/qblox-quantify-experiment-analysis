@@ -27,14 +27,20 @@ SNL315/
 
 ## Install
 
-Into the existing conda environment, without changing any installed packages:
+Recommended: create a separate env that copies the lab PC `qblox_env` exactly (Python 3.9.18, Windows) and installs this repo into it. `qblox_env` itself is not touched.
 
 ```
-conda activate qblox_env
+conda env create -f environment.yml
+conda activate qblox_dev
+```
+
+Or, inside an existing env that already has the packages, install only this package:
+
+```
 pip install -e . --no-deps
 ```
 
-On a fresh environment, `pip install -e .` pulls in the dependencies listed in `pyproject.toml`.
+The dependency versions in `pyproject.toml` are pinned to the ones in `qblox_env` (quantify-scheduler 0.23.1, quantify-core 0.9.1, qblox-instruments 0.16.0, qcodes 0.46.0, pygsti 0.9.14.3, qutip 5.0.2, numpy 1.26.4).
 
 Then import from the package, for example:
 
