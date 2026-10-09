@@ -22,8 +22,13 @@ src/qqea/
         clifford/                 Clifford group and RB sequences, adapted from PycQED (MIT)
     experiments/                  running experiments
         calibration_nodes.py      CalibrationNodes: resonator/qubit/gate calibration routines
-        hp83732b.py               qcodes driver for the HP 83732B signal generator
+        nodes/                    the node methods by topic: single_qubit, readout, iswap_stark, roadmap
+        runners.py                DRAG and readout-optimization runs that drive the cluster directly
+        saving.py                 save raw retrieve_acquisition() data as a quantify dataset
+        datadir.py                set_datadir_from_env(): data directory from QBLOX_DATADIR
+        hp83732b.py               qcodes driver for the HP 83732B signal generator (TWPA pump)
         simulated_data.py         simulated datasets for dry runs
+        dry_run.py                run the nodes on a dummy cluster (qblox_dev only)
     fitting/                      analysis: fitting and plotting
         readout.py                g/e discrimination, readout freq/amp/duration optimization, weights
         single_qubit.py           Ramsey chevron, conditional Ramsey, Rabi amplification, T1/T2, DRAG
@@ -87,7 +92,7 @@ The dependency versions in `pyproject.toml` are pinned to the ones in `qblox_env
 ## Usage
 
 ```python
-from qqea.schedules.single_qubit import rabi_sched_TWPA
+from qqea.schedules.single_qubit import rabi_sched
 from qqea.schedules.two_qubit import randomized_benchmarking_schedule
 from qqea.experiments.calibration_nodes import CalibrationNodes
 from qqea.fitting.fits import t1_and_t2_fit
