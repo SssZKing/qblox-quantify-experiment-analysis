@@ -10,12 +10,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
 
-from pycqed_randomized_benchmarking.clifford_group import (
+from qqea.schedules.clifford.clifford_group import (
     SingleQubitClifford,
     TwoQubitClifford,
     common_cliffords,
 )
-from pycqed_randomized_benchmarking.randomized_benchmarking import randomized_benchmarking_sequence
+from qqea.schedules.clifford.randomized_benchmarking import randomized_benchmarking_sequence
 from quantify_core.analysis.single_qubit_timedomain import SingleQubitTimedomainAnalysis
 from quantify_core.visualization.mpl_plotting import (
     set_suptitle_from_dataset,
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from quantify_scheduler.device_under_test.transmon_element import BasicTransmonElement
     from xarray import Dataset
 
-from TWPA_schedule import (TWPA_DELAY, TWPA_RINGUP, TWPA_TAIL)
+from qqea.schedules.single_qubit import (TWPA_DELAY, TWPA_RINGUP, TWPA_TAIL)
 # iSWAP_DELAY = 38e-9
 iSWAP_DELAY = 120e-9
 # Extra idle after every iSWAP (and sqrt-iSWAP) before the next operation, on top of the

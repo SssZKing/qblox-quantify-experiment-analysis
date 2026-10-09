@@ -2,21 +2,40 @@
 
 Python modules for running two-qubit transmon experiments on a Qblox cluster with quantify and analysing the results. They cover schedules, calibration nodes, fitting helpers, randomized benchmarking, state and process tomography, and gate set tomography.
 
-## Contents
+## Packages
+
+One package, `qqea` (short for qblox-quantify-experiment-analysis), with four subpackages split by role:
 
 ```
-src/
-    TWPA_schedule.py              quantify-scheduler schedules (with TWPA pump handling)
-    calibration_nodes.py          CalibrationNodes: resonator/qubit/gate calibration routines
-    helpers.py                    fitting and plotting helpers for quantify datasets
-    analyzer.py                   extra lmfit models (beating decay, multi-Lorentzian, swap decay)
-    tomography_tools.py           state/process tomography, MLE, pyGSTi helpers (+ PMatrix2.pkl)
-    simulated_data.py             simulated datasets for dry runs
-    HP83732B.py                   qcodes driver for the HP 83732B signal generator
-    pycqed_randomized_benchmarking/
-                                  Clifford groups and RB, adapted from PycQED (MIT), extended
-                                  for tomography, GST and iSWAP phase calibration
+src/qqea/
+    schedules/                    building experiment schedules
+        single_qubit.py           spectroscopy, Rabi, Ramsey, T1/T2, readout, DRAG, f-state, SNAIL/pump (TWPA-gated)
+        two_qubit.py              RB, simultaneous RB, iSWAP, state/process tomography and GST schedules
+        clifford/                 Clifford group and RB sequences, adapted from PycQED (MIT)
+    experiments/                  running experiments
+        calibration_nodes.py      CalibrationNodes: resonator/qubit/gate calibration routines
+        hp83732b.py               qcodes driver for the HP 83732B signal generator
+        simulated_data.py         simulated datasets for dry runs
+    fitting/                      analysis: fitting and plotting
+        fits.py                   fits for readout, Rabi, Ramsey, T1/T2, iSWAP chevron, RPE, RB, DRAG
+        models.py                 extra lmfit models (beating decay, multi-Lorentzian, swap decay)
+    tomography/                   analysis: tomography
+        tomography.py             state/process tomography, MLE, chi/unitary extraction, GST datasets
 ```
+
+This is a layout-only migration. Each module was moved whole from the old Python-Packages folder, and only its imports were changed. Finer splits, such as moving `RBAnalysis` out of `two_qubit.py`, are left for later.
+
+| Old import | New import |
+| --- | --- |
+| `TWPA_schedule` | `qqea.schedules.single_qubit` |
+| `pycqed_randomized_benchmarking.utils` | `qqea.schedules.two_qubit` |
+| `pycqed_randomized_benchmarking.clifford_group` | `qqea.schedules.clifford.clifford_group` |
+| `calibration_nodes` | `qqea.experiments.calibration_nodes` |
+| `HP83732B` | `qqea.experiments.hp83732b` |
+| `simulated_data` | `qqea.experiments.simulated_data` |
+| `helpers` | `qqea.fitting.fits` |
+| `analyzer` | `qqea.fitting.models` |
+| `tomography_tools` | `qqea.tomography.tomography` |
 
 ## Install
 
@@ -33,21 +52,16 @@ Or, inside an existing env that already has the packages, install only these mod
 pip install -e . --no-deps
 ```
 
-Use the editable install (`-e`), because `tomography_tools` loads `PMatrix2.pkl` from the file next to it.
-
 The dependency versions in `pyproject.toml` are pinned to the ones in `qblox_env` (quantify-scheduler 0.23.1, quantify-core 0.9.1, qblox-instruments 0.16.0, qcodes 0.46.0, pygsti 0.9.14.3, qutip 5.0.2, numpy 1.26.4).
 
 ## Usage
 
-The import names are the same as before, so notebook import lines don't change:
-
 ```python
-from helpers import *
-from TWPA_schedule import *
-from calibration_nodes import CalibrationNodes
-from tomography_tools import *
-from pycqed_randomized_benchmarking.utils import RBAnalysis, randomized_benchmarking_schedule
-import pycqed_randomized_benchmarking.utils as rbu
+from qqea.schedules.single_qubit import rabi_sched_TWPA
+from qqea.schedules.two_qubit import randomized_benchmarking_schedule
+from qqea.experiments.calibration_nodes import CalibrationNodes
+from qqea.fitting.fits import t1_and_t2_fit
+from qqea.tomography.tomography import calculate_density_matrix
 ```
 
-Once the package is installed, the `sys.path.insert(0, 'C:/Users/1238Tech/Documents/Python-Packages')` line is no longer needed. If you leave that line in, the old Python-Packages folder takes precedence over the installed copy.
+The old `Python-Packages` folder and the notebooks that put it on `sys.path` are not affected.
