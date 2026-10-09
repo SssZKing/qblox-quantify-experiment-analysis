@@ -530,3 +530,25 @@ def rotate_real_imag(real, imag):
 
     z_rot = z * np.exp(-1j * angle)
     return z_rot.real, z_rot.imag, angle
+
+
+def readout_fidelities(ds):
+    """(F_g, F_e) per channel of a Multiplexed Readout Calibration dataset, from the raw IQ.
+
+    Each channel's shots are projected onto the line through the |0> and |1> means and
+    the threshold that maximises F_g + F_e is used (the quantify analysis folder of this
+    run holds only the last channel's result, since the second analysis overwrites it).
+    """
+    states = ds.x0.values
+    out = []
+    for i in range(len(ds.data_vars) // 2):
+        z = ds["y%d" % (2 * i)].values + 1j * ds["y%d" % (2 * i + 1)].values
+        m0, m1 = z[states == 0].mean(), z[states == 1].mean()
+        proj = np.real((z - m0) * np.conj(m1 - m0)) / abs(m1 - m0)
+        p0, p1 = np.sort(proj[states == 0]), np.sort(proj[states == 1])
+        cut = np.sort(proj)
+        f_g = np.searchsorted(p0, cut, side="left") / p0.size
+        f_e = 1 - np.searchsorted(p1, cut, side="left") / p1.size
+        best = np.argmax(f_g + f_e)
+        out.append((f_g[best], f_e[best]))
+    return out

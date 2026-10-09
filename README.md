@@ -34,7 +34,8 @@ src/qqea/
         single_qubit.py           Ramsey chevron, conditional Ramsey, Rabi amplification, T1/T2, DRAG
         two_qubit.py              iSWAP chevron, theta_p, RPE
         rb.py                     rb_simple_fit and RBAnalysis
-        models.py                 extra lmfit models (beating decay, multi-Lorentzian, swap decay)
+        models.py                 extra lmfit models (beating decay, multi-Lorentzian, iSWAP exchange)
+        iswap_exchange.py         iSWAP population exchange in T1, Tphi, t_iSWAP; iSWAP gate-error budget
         plotting.py, units.py, dataset_info.py, saving.py
         fits.py                   the old helpers namespace, re-exporting all of the above
     tomography/                   analysis: tomography
