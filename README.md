@@ -9,8 +9,16 @@ One package, `qqea` (short for qblox-quantify-experiment-analysis), with four su
 ```
 src/qqea/
     schedules/                    building experiment schedules
-        single_qubit.py           spectroscopy, Rabi, Ramsey, T1/T2, readout, DRAG, f-state, SNAIL/pump (TWPA-gated)
-        two_qubit.py              RB, simultaneous RB, iSWAP, state/process tomography and GST schedules
+        single_qubit.py           spectroscopy, Rabi, Ramsey, T1/T2, readout, DRAG, f-state, SNAIL/pump
+        two_qubit.py              re-exports the two-qubit modules below, plus RBAnalysis
+        gates.py                  iSWAP gate, Clifford index to operations, iSWAP timing settings
+        phase.py                  iSWAP virtual-Z phase corrections
+        rb.py                     randomized benchmarking and simultaneous RB
+        iswap.py                  iSWAP characterisation: pulsed pump, pump-probe, phase tracking, RPE
+        tomography.py             state and process tomography schedules
+        gst.py                    gate set tomography schedules from pyGSTi circuits
+        twpa.py                   TWPA pump marker for readout, per-qubit on/off switch
+        edges.py                  CompositeiSWAPEdge, the iSWAP edge for the quantum device
         clifford/                 Clifford group and RB sequences, adapted from PycQED (MIT)
     experiments/                  running experiments
         calibration_nodes.py      CalibrationNodes: resonator/qubit/gate calibration routines
@@ -33,6 +41,18 @@ src/qqea/
         tomography.py             the old flat tomography_tools namespace
 ```
 
+Imports from `qqea.schedules.two_qubit` keep working; it re-exports every two-qubit builder.
+
+Schedule builders no longer end in `_TWPA` (`rabi_sched_TWPA` is now `rabi_sched`), and there are no aliases under the old names. Some names now match builders in `quantify_scheduler.schedules`, so prefer `from qqea.schedules import single_qubit as sq` over star imports.
+
+Whether a qubit's readout triggers the TWPA pump is a per-qubit setting. Every qubit pumps unless told otherwise:
+
+```python
+from qqea.schedules.twpa import set_twpa_pump
+set_twpa_pump(qubit2, False)
+```
+
+The iSWAP edge now ships in the package: `from qqea.schedules.edges import CompositeiSWAPEdge`.
 This is a layout-only migration. Each module was moved whole from the old Python-Packages folder, and only its imports were changed. Finer splits are done per subpackage.
 
 | Old import | New import |
