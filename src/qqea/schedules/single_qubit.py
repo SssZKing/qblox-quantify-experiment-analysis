@@ -179,7 +179,7 @@ def sweep_optimal_TWPA(
         
     return schedule
 
-def heterodyne_spec_sched_nco_TWPA(
+def heterodyne_spec_sched_nco(
     pulse_amp: float,
     pulse_duration: float,
     frequencies: np.ndarray,
@@ -243,7 +243,7 @@ def heterodyne_spec_sched_nco_TWPA(
         
     return schedule
 
-# def multiplexed_heterodyne_spec_sched_nco_TWPA(
+# def multiplexed_heterodyne_spec_sched_nco(
 #     pulse_amp: float,
 #     pulse_duration: float,
 #     frequencies_qubit1: np.ndarray,
@@ -315,7 +315,7 @@ def heterodyne_spec_sched_nco_TWPA(
         
 #     return schedule
 
-def multiplexed_heterodyne_spec_sched_nco_TWPA(
+def multiplexed_heterodyne_spec_sched_nco(
     pulse_amp: float,
     pulse_duration: float,
     frequencies_qubit1: np.ndarray,
@@ -391,7 +391,7 @@ def multiplexed_heterodyne_spec_sched_nco_TWPA(
         
     return schedule
 
-def two_tone_spec_sched_nco_TWPA(
+def two_tone_spec_sched_nco(
     spec_pulse_amp: float,
     spec_pulse_duration: float,
     spec_pulse_port: str,
@@ -475,7 +475,7 @@ def two_tone_spec_sched_nco_TWPA(
 
     return schedule
 
-def multiplexed_two_tone_spec_sched_nco_TWPA(
+def multiplexed_two_tone_spec_sched_nco(
     qubits: list[any],
     pulse_amp: float,
     pulse_duration: float,
@@ -555,7 +555,7 @@ def multiplexed_two_tone_spec_sched_nco_TWPA(
         
     return schedule
 
-def rabi_sched_TWPA(
+def rabi_sched(
     pulse_amp: Union[np.ndarray, float],
     pulse_duration: Union[np.ndarray, float],
     frequency: float,
@@ -623,7 +623,7 @@ def rabi_sched_TWPA(
 
     return schedule
 
-def rabi_amplification_TWPA(
+def rabi_amplification(
     pulse_amp: Union[np.ndarray, float],
     pulse_duration: Union[np.ndarray, float],
     pi_number: np.ndarray,
@@ -693,7 +693,7 @@ def rabi_amplification_TWPA(
 
     return schedule
 
-def ramsey_sched_TWPA(
+def ramsey_sched(
     times: Union[np.ndarray, float],
     qubit: any,
     artificial_detuning: float = 0,
@@ -800,7 +800,7 @@ def add_stark_tone(
         label=None if label is None else f"Stark tail {label}",
     )
 
-def stark_ramsey_sched_TWPA(
+def stark_ramsey_sched(
     times: Union[np.ndarray, float],
     qubit: any,
     stark_amp: float,
@@ -818,7 +818,7 @@ def stark_ramsey_sched_TWPA(
     ``STARK_LEAD`` before the first X90, inside the reset wait, so the Stark shift
     is in steady state, stays on under both pi/2 pulses (outputs add, so keep
     ``stark_amp + rxy.amp180`` below 1) and turns off when the readout finishes.
-    ``times`` are start-to-start delays as in ``ramsey_sched_TWPA``.
+    ``times`` are start-to-start delays as in ``ramsey_sched``.
     """
 
     readout_duration = qubit.measure.pulse_duration()
@@ -861,7 +861,7 @@ def stark_ramsey_sched_TWPA(
 
     return schedule
 
-def coupled_ramsey_sched_TWPA(
+def coupled_ramsey_sched(
     times: Union[np.ndarray, float],
     qubit: BasicTransmonElement,
     qubit_c: BasicTransmonElement,
@@ -923,7 +923,7 @@ def coupled_ramsey_sched_TWPA(
         
     return schedule
 
-def coupled_phase_ramsey_sched_TWPA(
+def coupled_phase_ramsey_sched(
     phases: Union[np.ndarray, float],
     qubit: BasicTransmonElement,
     qubit_c: BasicTransmonElement,
@@ -980,7 +980,7 @@ def coupled_phase_ramsey_sched_TWPA(
         
     return schedule
 
-def echo_sched_TWPA(
+def echo_sched(
     times: Union[np.ndarray, float],
     qubit: any,
     repetitions: int = 1,
@@ -1015,7 +1015,7 @@ def echo_sched_TWPA(
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
     return schedule
 
-def t1_sched_TWPA(
+def t1_sched(
     times: Union[np.ndarray, float],
     qubit: any,
     repetitions: int = 1,
@@ -1051,7 +1051,7 @@ def t1_sched_TWPA(
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
     return schedule
 
-def t1_and_t2_TWPA(
+def t1_and_t2(
     times: Union[np.ndarray, float],
     qubit: any,
     case: Union[np.ndarray, int],
@@ -1111,7 +1111,7 @@ def t1_and_t2_TWPA(
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
     return schedule
 
-def multi_qubit_t1_and_t2_TWPA(
+def multi_qubit_t1_and_t2(
     times: Union[np.ndarray, float],
     qubit_specifier: BasicTransmonElement | Iterable[BasicTransmonElement],
     case: Union[np.ndarray, int],
@@ -1169,7 +1169,7 @@ def multi_qubit_t1_and_t2_TWPA(
             schedule.add(IdlePulse(duration=4e-9))
     return schedule
     
-def multiplexed_readout_calibration_sched_TWPA(
+def multiplexed_readout_calibration_sched(
     qubits: List[any],
     prepared_states: List[int],
     repetitions: int = 1,
@@ -1207,7 +1207,7 @@ def multiplexed_readout_calibration_sched_TWPA(
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
     return schedule
     
-def readout_calibration_sched_TWPA(
+def readout_calibration_sched(
     qubit: any,
     prepared_states: List[int],
     repetitions: int = 1,
@@ -1469,7 +1469,7 @@ def readout_weight_optimization_TWPA(
 
     return g_trace, e_trace
 
-def allxy_sched_TWPA(
+def allxy_sched(
     qubit: any,
     element_select_idx: Union[np.ndarray, int] = np.arange(21),
     repetitions: int = 1,
@@ -1599,7 +1599,7 @@ def DRAG_calibration_sched(
     return instrument_coordinator.retrieve_acquisition()
     
 
-def dressed_e_cavity_TWPA(
+def dressed_e_cavity(
     pulse_amp: float,
     pulse_duration: float,
     frequencies: np.ndarray,
@@ -1670,7 +1670,7 @@ def dressed_e_cavity_TWPA(
 
     return schedule
 
-def f_state_spec_sched_nco_TWPA(
+def f_state_spec_sched_nco(
     spec_pulse_amp: float,
     spec_pulse_duration: float,
     spec_pulse_port: str,
@@ -1720,7 +1720,7 @@ def f_state_spec_sched_nco_TWPA(
 
     return schedule
 
-def f_state_rabi_sched_TWPA(
+def f_state_rabi_sched(
     pulse_amp: Union[np.ndarray, float],
     pulse_duration: Union[np.ndarray, float],
     frequency: float,
@@ -1844,7 +1844,7 @@ def f_state_rabi_sched_TWPA(
         
 #     return schedule
 
-def f_state_cavity_TWPA(
+def f_state_cavity(
     pulse_amp: float,
     pulse_duration: float,
     frequencies: np.ndarray,
@@ -1924,7 +1924,7 @@ def f_state_cavity_TWPA(
 
     return schedule
 
-def f_state_t1_TWPA(
+def f_state_t1(
     times: Union[np.ndarray, float],
     qubit: any,
     case: Union[np.ndarray, int],
@@ -1993,7 +1993,7 @@ def f_state_t1_TWPA(
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
     return schedule
 
-def multiplex_IQ_TWPA(
+def multiplex_IQ(
     qubit: any,
     prepared_states: List[int],
     multiplexing_freq: List[float],
@@ -2076,7 +2076,7 @@ def multiplex_IQ_TWPA(
         
     return schedule
 
-def RO_raw_trace_TWPA(
+def RO_raw_trace(
     qubit: any,
     trace_time: float,
     prepared_states: List[int],
@@ -2160,7 +2160,7 @@ def RO_raw_trace_TWPA(
         
     return schedule
 
-def rabi_population_TWPA(
+def rabi_population(
     qubit: any,
     case: int,
     angles: Union[np.ndarray, float],
@@ -2241,7 +2241,7 @@ def rabi_population_TWPA(
         
     return schedule
 
-def SNAIL_swap_sched_TWPA(
+def SNAIL_swap_sched(
     pulse_frequency: Union[np.ndarray, float],
     pulse_amp: Union[np.ndarray, float],
     pulse_duration: Union[np.ndarray, float],
@@ -2344,7 +2344,7 @@ def SNAIL_swap_sched_TWPA(
 
     return schedule
 
-def SNAIL_spec_sched_TWPA(
+def SNAIL_spec_sched(
     spec_pulse_amp: float,
     spec_pulse_duration: float,
     spec_pulse_frequencies: np.ndarray,
@@ -2434,7 +2434,7 @@ def SNAIL_spec_sched_TWPA(
 
 #     return schedule
 
-def pump_heterodyne_spec_sched_nco_TWPA(
+def pump_heterodyne_spec_sched_nco(
     pump_frequency: Union[np.ndarray, float],
     pump_amp: Union[np.ndarray, float],
     pump_duration: Union[np.ndarray, float],
@@ -2540,7 +2540,7 @@ def pump_heterodyne_spec_sched_nco_TWPA(
         
     return schedule
 
-def pump_t1_sched_TWPA(
+def pump_t1_sched(
     times: Union[np.ndarray, float],
     snail_drive: any,
     qubit_specifier: BasicTransmonElement | Iterable[BasicTransmonElement],
@@ -2594,7 +2594,7 @@ def pump_t1_sched_TWPA(
 
     return schedule
 
-def pump_ramsey_sched_TWPA(
+def pump_ramsey_sched(
     times: Union[np.ndarray, float],
     snail_drive: any,
     qubit_specifier: BasicTransmonElement | Iterable[BasicTransmonElement],
@@ -2656,7 +2656,7 @@ def pump_ramsey_sched_TWPA(
 
     return schedule
 
-def pump_t1_and_t2_sched_TWPA(
+def pump_t1_and_t2_sched(
     times: Union[np.ndarray, float],
     snail_drive: any,
     qubit_specifier: BasicTransmonElement | Iterable[BasicTransmonElement],
@@ -2734,7 +2734,7 @@ def pump_t1_and_t2_sched_TWPA(
 
     return schedule
 
-def pump_RPM_TWPA(
+def pump_RPM(
     qubit: any,
     case: int,
     angles: Union[np.ndarray, float],
@@ -2811,7 +2811,7 @@ def pump_RPM_TWPA(
         
     return schedule
 
-def cavity_charging_TWPA(
+def cavity_charging(
     qubit: BasicTransmonElement,
     pulse_amp: Union[np.ndarray, float],
     frequency: float,
@@ -2862,3 +2862,39 @@ def cavity_charging_TWPA(
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
         
     return schedule
+
+
+# Old names, kept so existing notebooks and calibration_nodes keep working.
+heterodyne_spec_sched_nco_TWPA = heterodyne_spec_sched_nco
+multiplexed_heterodyne_spec_sched_nco_TWPA = multiplexed_heterodyne_spec_sched_nco
+two_tone_spec_sched_nco_TWPA = two_tone_spec_sched_nco
+multiplexed_two_tone_spec_sched_nco_TWPA = multiplexed_two_tone_spec_sched_nco
+rabi_sched_TWPA = rabi_sched
+rabi_amplification_TWPA = rabi_amplification
+ramsey_sched_TWPA = ramsey_sched
+stark_ramsey_sched_TWPA = stark_ramsey_sched
+coupled_ramsey_sched_TWPA = coupled_ramsey_sched
+coupled_phase_ramsey_sched_TWPA = coupled_phase_ramsey_sched
+echo_sched_TWPA = echo_sched
+t1_sched_TWPA = t1_sched
+t1_and_t2_TWPA = t1_and_t2
+multi_qubit_t1_and_t2_TWPA = multi_qubit_t1_and_t2
+multiplexed_readout_calibration_sched_TWPA = multiplexed_readout_calibration_sched
+readout_calibration_sched_TWPA = readout_calibration_sched
+allxy_sched_TWPA = allxy_sched
+dressed_e_cavity_TWPA = dressed_e_cavity
+f_state_spec_sched_nco_TWPA = f_state_spec_sched_nco
+f_state_rabi_sched_TWPA = f_state_rabi_sched
+f_state_cavity_TWPA = f_state_cavity
+f_state_t1_TWPA = f_state_t1
+multiplex_IQ_TWPA = multiplex_IQ
+RO_raw_trace_TWPA = RO_raw_trace
+rabi_population_TWPA = rabi_population
+SNAIL_swap_sched_TWPA = SNAIL_swap_sched
+SNAIL_spec_sched_TWPA = SNAIL_spec_sched
+pump_heterodyne_spec_sched_nco_TWPA = pump_heterodyne_spec_sched_nco
+pump_t1_sched_TWPA = pump_t1_sched
+pump_ramsey_sched_TWPA = pump_ramsey_sched
+pump_t1_and_t2_sched_TWPA = pump_t1_and_t2_sched
+pump_RPM_TWPA = pump_RPM
+cavity_charging_TWPA = cavity_charging
