@@ -54,6 +54,10 @@ pip install -e . --no-deps
 
 The dependency versions in `pyproject.toml` are pinned to the ones in `qblox_env` (quantify-scheduler 0.23.1, quantify-core 0.9.1, qblox-instruments 0.16.0, qcodes 0.46.0, pygsti 0.9.14.3, qutip 5.0.2, numpy 1.26.4).
 
+## License
+
+MIT, see [LICENSE](LICENSE). `qqea/schedules/clifford/` is adapted from [PycQED](https://github.com/DiCarloLab-Delft/PycQED_py3) and keeps its own MIT notice in `src/qqea/schedules/clifford/LICENSE.txt`.
+
 ## Usage
 
 ```python

@@ -8,6 +8,17 @@ version = "0.1.0"
 description = "Qblox/quantify experiment schedules, calibration nodes and analysis tools (RB, state/process tomography, GST)"
 readme = "README.md"
 requires-python = ">=3.9"  # qblox_env runs 3.9.18
+license = {text = "MIT"}
+authors = [{name = "Zhuo Shen"}]
+urls = {Repository = "https://github.com/SssZKing/qblox-quantify-experiment-analysis"}
+keywords = ["qblox", "quantify", "superconducting qubits", "transmon", "randomized benchmarking", "tomography", "gate set tomography"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+]
 # Pinned to the versions in the lab PC qblox_env (2026-10-09); see environment.yml for the full env.
 dependencies = [
     "numpy==1.26.4",
