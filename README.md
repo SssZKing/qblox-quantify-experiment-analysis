@@ -17,8 +17,13 @@ src/qqea/
         hp83732b.py               qcodes driver for the HP 83732B signal generator
         simulated_data.py         simulated datasets for dry runs
     fitting/                      analysis: fitting and plotting
-        fits.py                   fits for readout, Rabi, Ramsey, T1/T2, iSWAP chevron, RPE, RB, DRAG
+        readout.py                g/e discrimination, readout freq/amp/duration optimization, weights
+        single_qubit.py           Ramsey chevron, conditional Ramsey, Rabi amplification, T1/T2, DRAG
+        two_qubit.py              iSWAP chevron, theta_p, RPE
+        rb.py                     rb_simple_fit and RBAnalysis
         models.py                 extra lmfit models (beating decay, multi-Lorentzian, swap decay)
+        plotting.py, units.py, dataset_info.py, saving.py
+        fits.py                   the old helpers namespace, re-exporting all of the above
     tomography/                   analysis: tomography
         state.py                  two-qubit density matrices: linear inversion, MLE
         process.py                process tomography: linear inversion, CPTP MLE, SPAM correction, fidelities
@@ -28,7 +33,7 @@ src/qqea/
         tomography.py             the old flat tomography_tools namespace
 ```
 
-This is a layout-only migration. Each module was moved whole from the old Python-Packages folder, and only its imports were changed. Finer splits, such as moving `RBAnalysis` out of `two_qubit.py`, are left for later.
+This is a layout-only migration. Each module was moved whole from the old Python-Packages folder, and only its imports were changed. Finer splits are done per subpackage.
 
 | Old import | New import |
 | --- | --- |
@@ -79,3 +84,12 @@ pytest
 Run them in `qblox_dev` after `pip install -e . --no-deps` (they need qutip, scipy, xarray, and pyGSTi/quantify-core for the reference copy of the old modules).
 
 The old `Python-Packages` folder and the notebooks that put it on `sys.path` are not affected.
+
+## Tests
+
+In `qblox_dev` (never `qblox_env`):
+
+```
+pip install pytest
+python -m pytest tests
+```
