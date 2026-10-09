@@ -1,25 +1,24 @@
 from __future__ import annotations
 
-from typing import Optional, List, Literal, Union
+from typing import TYPE_CHECKING, List, Literal, Optional, Union
 
 import numpy as np
-
+from quantify_scheduler.backends.graph_compilation import SerialCompiler
 from quantify_scheduler.enums import BinMode
-from quantify_scheduler.operations.acquisition_library import SSBIntegrationComplex, Trace, NumericalWeightedIntegration
-from quantify_scheduler.operations.gate_library import X90, Measure, Reset, Rxy, X, Y
+from quantify_scheduler.operations.acquisition_library import (
+    SSBIntegrationComplex,
+    Trace,
+)
+from quantify_scheduler.operations.gate_library import X90, Measure, Reset, Rxy, X
 from quantify_scheduler.operations.pulse_library import (
-    IdlePulse,
-    SetClockFrequency,
-    ResetClockPhase,
-    SquarePulse,
-    MarkerPulse,
     DRAGPulse,
+    IdlePulse,
+    MarkerPulse,
+    ResetClockPhase,
+    SetClockFrequency,
+    SquarePulse,
     VoltageOffset,
 )
-from quantify_scheduler.qblox.operations import ConditionalReset
-from quantify_scheduler.backends.qblox.operations.rf_switch_toggle import RFSwitchToggle
-from quantify_scheduler.backends.graph_compilation import SerialCompiler
-from quantify_scheduler.operations.shared_native_library import SpectroscopyOperation
 from quantify_scheduler.resources import ClockResource
 from quantify_scheduler.schedules.schedule import Schedule
 
@@ -31,6 +30,14 @@ from qqea.schedules.twpa import (
     max_readout_duration,
     measure_with_twpa,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from qcodes.instrument import Instrument
+    from quantify_scheduler.device_under_test.transmon_element import (
+        BasicTransmonElement,
+    )
 
 STARK_LEAD = 10e-6  # Stark tone turns on this long before the end of Reset
 
@@ -53,6 +60,29 @@ E2F_G_AMP = 0.28971234624362635
 def _e2f_pulse(amp: float | None, duration: float | None) -> tuple[float, float]:
     """e-f Gaussian pulse amplitude and duration, defaulting to E2F_G_AMP and E2F_DURATION."""
     return (E2F_G_AMP if amp is None else amp, E2F_DURATION if duration is None else duration)
+
+
+def _broadcast_amp_duration(amp, duration) -> tuple[np.ndarray, np.ndarray]:
+    """Return ``amp`` and ``duration`` as equal-length arrays.
+
+    Either both have the same length, or one of them is a single value that is
+    repeated to the length of the other.
+    """
+    amps = np.asarray(amp)
+    amps = amps.reshape(amps.shape or (1,))
+    durations = np.asarray(duration)
+    durations = durations.reshape(durations.shape or (1,))
+
+    if len(amps) == 1:
+        amps = np.ones(np.shape(durations)) * amps
+    elif len(durations) == 1:
+        durations = np.ones(np.shape(amps)) * durations
+    elif len(durations) != len(amps):
+        raise ValueError(
+            f"Shapes of amplitude ({amps.shape}) and "
+            f"duration ({durations.shape}) are incompatible."
+        )
+    return amps, durations
 
 
 def time_of_flight_calibration(
@@ -245,78 +275,6 @@ def heterodyne_spec_sched_nco(
         
     return schedule
 
-# def multiplexed_heterodyne_spec_sched_nco(
-#     pulse_amp: float,
-#     pulse_duration: float,
-#     frequencies_qubit1: np.ndarray,
-#     frequencies_qubit2: np.ndarray,
-#     acquisition_delay: float,
-#     integration_time: float,
-#     ports,
-#     clocks,
-#     init_duration: float = 10e-6,
-#     repetitions: int = 1,
-#     port_out: Optional[str] = None,
-# ) -> Schedule:
-    
-#     schedule = Schedule("Multiplexed heterodyne spectroscopy (NCO sweep)(TWPA)", repetitions)
-
-#     if port_out is None:
-#             port_out = ports
-        
-#     for acq_channel, clock in enumerate(clocks):
-#         if acq_channel == 0:
-#             frequencies = frequencies_qubit1
-#         if acq_channel == 1:
-#             frequencies = frequencies_qubit2
-
-#         schedule.add_resource(ClockResource(name=clock, freq=frequencies.flat[0]))
-
-#         for i, freq in enumerate(frequencies):
-#             schedule.add(IdlePulse(duration=init_duration))
-
-#             schedule.add(
-#                 SetClockFrequency(clock=clocks[acq_channel], clock_freq_new=freq),
-#             )
-
-#             spec_pulse = schedule.add(
-#                 SquarePulse(
-#                     duration=pulse_duration,
-#                     amp=pulse_amp,
-#                     port=port_out[acq_channel],
-#                     clock=clocks[acq_channel],
-#                 ),
-#             )
-
-#             schedule.add(
-#                 SSBIntegrationComplex(
-#                     duration=integration_time,
-#                     port=ports[acq_channel],
-#                     clock=clocks[acq_channel],
-#                     acq_index=i,
-#                     acq_channel=acq_channel,
-#                     bin_mode=BinMode.AVERAGE,
-#                 ),
-#                 ref_op=spec_pulse,
-#                 ref_pt="start",
-#                 rel_time=acquisition_delay,
-#             )
-
-#             if acq_channel == 0:
-#                 marker_pulse = schedule.add(
-#                     MarkerPulse(
-#                         duration=integration_time+TWPA_RINGUP+TWPA_TAIL, 
-#                         port=ports[0][:-3] + "switch",
-#                     ),
-#                     ref_op=spec_pulse,
-#                     ref_pt="start",
-#                     rel_time=TWPA_DELAY-TWPA_RINGUP,
-#                 )
-    
-#                 schedule.add(IdlePulse(duration=4e-9))
-        
-#     return schedule
-
 def multiplexed_heterodyne_spec_sched_nco(
     pulse_amp: float,
     pulse_duration: float,
@@ -478,7 +436,7 @@ def two_tone_spec_sched_nco(
     return schedule
 
 def multiplexed_two_tone_spec_sched_nco(
-    qubits: list[any],
+    qubits: list[BasicTransmonElement],
     pulse_amp: float,
     pulse_duration: float,
     frequencies_qubit1: np.ndarray,
@@ -561,7 +519,7 @@ def rabi_sched(
     pulse_amp: Union[np.ndarray, float],
     pulse_duration: Union[np.ndarray, float],
     frequency: float,
-    qubit: any,
+    qubit: BasicTransmonElement,
     port: str = None,
     clock: str = None,
     repetitions: int = 1,
@@ -570,23 +528,7 @@ def rabi_sched(
     readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     
-    # ensure pulse_amplitude and pulse_duration are iterable.
-    amps = np.asarray(pulse_amp)
-    amps = amps.reshape(amps.shape or (1,))
-    durations = np.asarray(pulse_duration)
-    durations = durations.reshape(durations.shape or (1,))
-
-    # either the shapes of the amp and duration must match or one of
-    # them must be a constant floating point value.
-    if len(amps) == 1:
-        amps = np.ones(np.shape(durations)) * amps
-    elif len(durations) == 1:
-        durations = np.ones(np.shape(amps)) * durations
-    elif len(durations) != len(amps):
-        raise ValueError(
-            f"Shapes of pulse_amplitude ({pulse_amp.shape}) and "
-            f"pulse_duration ({pulse_duration.shape}) are incompatible."
-        )
+    amps, durations = _broadcast_amp_duration(pulse_amp, pulse_duration)
 
     if port is None:
         port = f"{qubit}:mw"
@@ -630,7 +572,7 @@ def rabi_amplification(
     pulse_duration: Union[np.ndarray, float],
     pi_number: np.ndarray,
     frequency: float,
-    qubit: any,
+    qubit: BasicTransmonElement,
     port: str = None,
     clock: str = None,
     repetitions: int = 1,
@@ -639,23 +581,7 @@ def rabi_amplification(
     readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     
-    # ensure pulse_amplitude and pulse_duration are iterable.
-    amps = np.asarray(pulse_amp)
-    amps = amps.reshape(amps.shape or (1,))
-    durations = np.asarray(pulse_duration)
-    durations = durations.reshape(durations.shape or (1,))
-
-    # either the shapes of the amp and duration must match or one of
-    # them must be a constant floating point value.
-    if len(amps) == 1:
-        amps = np.ones(np.shape(durations)) * amps
-    elif len(durations) == 1:
-        durations = np.ones(np.shape(amps)) * durations
-    elif len(durations) != len(amps):
-        raise ValueError(
-            f"Shapes of pulse_amplitude ({pulse_amp.shape}) and "
-            f"pulse_duration ({pulse_duration.shape}) are incompatible."
-        )
+    amps, durations = _broadcast_amp_duration(pulse_amp, pulse_duration)
 
     if port is None:
         port = f"{qubit}:mw"
@@ -697,7 +623,7 @@ def rabi_amplification(
 
 def ramsey_sched(
     times: Union[np.ndarray, float],
-    qubit: any,
+    qubit: BasicTransmonElement,
     artificial_detuning: float = 0,
     acq_protocol: Literal[
         "SSBIntegrationComplex", "ThresholdedAcquisition", "NumericalSeparatedWeightedIntegration"
@@ -804,7 +730,7 @@ def add_stark_tone(
 
 def stark_ramsey_sched(
     times: Union[np.ndarray, float],
-    qubit: any,
+    qubit: BasicTransmonElement,
     stark_amp: float,
     stark_freq: float,
     artificial_detuning: float = 0,
@@ -984,7 +910,7 @@ def coupled_phase_ramsey_sched(
 
 def echo_sched(
     times: Union[np.ndarray, float],
-    qubit: any,
+    qubit: BasicTransmonElement,
     repetitions: int = 1,
     acq_protocol: Literal[
         "SSBIntegrationComplex", "ThresholdedAcquisition", "NumericalSeparatedWeightedIntegration"
@@ -1019,7 +945,7 @@ def echo_sched(
 
 def t1_sched(
     times: Union[np.ndarray, float],
-    qubit: any,
+    qubit: BasicTransmonElement,
     repetitions: int = 1,
     acq_protocol: Literal[
         "SSBIntegrationComplex", "ThresholdedAcquisition", "NumericalSeparatedWeightedIntegration"
@@ -1055,7 +981,7 @@ def t1_sched(
 
 def t1_and_t2(
     times: Union[np.ndarray, float],
-    qubit: any,
+    qubit: BasicTransmonElement,
     case: Union[np.ndarray, int],
     artificial_detuning: float = 0,
     repetitions: int = 1,
@@ -1172,7 +1098,7 @@ def multi_qubit_t1_and_t2(
     return schedule
     
 def multiplexed_readout_calibration_sched(
-    qubits: List[any],
+    qubits: list[BasicTransmonElement],
     prepared_states: List[int],
     repetitions: int = 1,
     acq_protocol: Literal[
@@ -1210,7 +1136,7 @@ def multiplexed_readout_calibration_sched(
     return schedule
     
 def readout_calibration_sched(
-    qubit: any,
+    qubit: BasicTransmonElement,
     prepared_states: List[int],
     repetitions: int = 1,
     acq_protocol: Literal[
@@ -1475,7 +1401,7 @@ def readout_weight_optimization_TWPA(
     return g_trace, e_trace
 
 def allxy_sched(
-    qubit: any,
+    qubit: BasicTransmonElement,
     element_select_idx: Union[np.ndarray, int] = np.arange(21),
     repetitions: int = 1,
 ) -> Schedule:
@@ -1681,7 +1607,7 @@ def f_state_spec_sched_nco(
     spec_pulse_port: str,
     spec_pulse_clock: str,
     spec_pulse_frequencies: np.ndarray,
-    qubit: any,
+    qubit: BasicTransmonElement,
     repetitions: int = 1,
 ) -> Schedule:
 
@@ -1729,7 +1655,7 @@ def f_state_rabi_sched(
     pulse_amp: Union[np.ndarray, float],
     pulse_duration: Union[np.ndarray, float],
     frequency: float,
-    qubit: any,
+    qubit: BasicTransmonElement,
     port: str = None,
     clock: str = None,
     repetitions: int = 1,
@@ -1738,23 +1664,7 @@ def f_state_rabi_sched(
     readout_duration = qubit.measure.pulse_duration()
     qubit = qubit.name
     
-    # ensure pulse_amplitude and pulse_duration are iterable.
-    amps = np.asarray(pulse_amp)
-    amps = amps.reshape(amps.shape or (1,))
-    durations = np.asarray(pulse_duration)
-    durations = durations.reshape(durations.shape or (1,))
-
-    # either the shapes of the amp and duration must match or one of
-    # them must be a constant floating point value.
-    if len(amps) == 1:
-        amps = np.ones(np.shape(durations)) * amps
-    elif len(durations) == 1:
-        durations = np.ones(np.shape(amps)) * durations
-    elif len(durations) != len(amps):
-        raise ValueError(
-            f"Shapes of pulse_amplitude ({pulse_amp.shape}) and "
-            f"pulse_duration ({pulse_duration.shape}) are incompatible."
-        )
+    amps, durations = _broadcast_amp_duration(pulse_amp, pulse_duration)
 
     if port is None:
         port = f"{qubit}:fs"
@@ -1803,51 +1713,6 @@ def f_state_rabi_sched(
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
 
     return schedule
-
-# def f_state_ramsey_sched_TWPA(
-#     times: Union[np.ndarray, float],
-#     qubit: any,
-#     artificial_detuning: float = 0,
-#     repetitions: int = 1,
-# ) -> Schedule:
-
-#     marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
-#     qubit = qubit.name
-    
-#     # ensure times is an iterable when passing floats.
-#     times = np.asarray(times)
-#     times = times.reshape(times.shape or (1,))
-
-#     schedule = Schedule("Ramsey(TWPA)", repetitions)
-
-#     if isinstance(times, float):
-#         times = [times]
-
-#     for i, tau in enumerate(times):
-#         schedule.add(Reset(qubit), label=f"Reset {i}")
-#         schedule.add(X90(qubit))
-
-#         # the phase of the second pi/2 phase progresses to propagate
-#         recovery_phase = np.rad2deg(2 * np.pi * artificial_detuning * tau)
-#         schedule.add(
-#             Rxy(theta=90, phi=recovery_phase, qubit=qubit), ref_pt="start", rel_time=tau
-#         )
-#         ro_pulse = schedule.add(Measure(qubit, acq_index=i), label=f"Measurement {i}")
-
-#         marker_pulse = schedule.add(
-#             MarkerPulse(
-#                 duration=marker_duration,
-#                 port=qubit + ":switch",
-#             ),
-#             ref_op=ro_pulse,
-#             ref_pt="start",
-#             rel_time=TWPA_DELAY-TWPA_RINGUP,
-#             label=f"TWPA_mark {i})",
-#         )
-
-#         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
-        
-#     return schedule
 
 def f_state_cavity(
     pulse_amp: float,
@@ -1934,7 +1799,7 @@ def f_state_cavity(
 
 def f_state_t1(
     times: Union[np.ndarray, float],
-    qubit: any,
+    qubit: BasicTransmonElement,
     case: Union[np.ndarray, int],
     repetitions: int = 1,
     acq_protocol: Literal[
@@ -2005,7 +1870,7 @@ def f_state_t1(
     return schedule
 
 def multiplex_IQ(
-    qubit: any,
+    qubit: BasicTransmonElement,
     prepared_states: List[int],
     multiplexing_freq: List[float],
     repetitions: int = 1,
@@ -2091,7 +1956,7 @@ def multiplex_IQ(
     return schedule
 
 def RO_raw_trace(
-    qubit: any,
+    qubit: BasicTransmonElement,
     trace_time: float,
     prepared_states: List[int],
     multiplexing_freq: List[float],
@@ -2178,7 +2043,7 @@ def RO_raw_trace(
     return schedule
 
 def rabi_population(
-    qubit: any,
+    qubit: BasicTransmonElement,
     case: int,
     angles: Union[np.ndarray, float],
     repetitions: int = 1,
@@ -2265,7 +2130,7 @@ def SNAIL_swap_sched(
     pulse_frequency: Union[np.ndarray, float],
     pulse_amp: Union[np.ndarray, float],
     pulse_duration: Union[np.ndarray, float],
-    snail_drive: any,
+    snail_drive: Instrument,
     qubit_specifier: BasicTransmonElement | Iterable[BasicTransmonElement],
     qubit_e: BasicTransmonElement | Iterable[BasicTransmonElement],
     swap_type: Literal['iSWAP', 'bSWAP'],
@@ -2287,23 +2152,7 @@ def SNAIL_swap_sched(
 
     snail_drive.frequency(pulse_frequency)
     
-    # ensure pulse_amplitude and pulse_duration are iterable.
-    amps = np.asarray(pulse_amp)
-    amps = amps.reshape(amps.shape or (1,))
-    durations = np.asarray(pulse_duration)
-    durations = durations.reshape(durations.shape or (1,))
-
-    # either the shapes of the amp and duration must match or one of
-    # them must be a constant floating point value.
-    if len(amps) == 1:
-        amps = np.ones(np.shape(durations)) * amps
-    elif len(durations) == 1:
-        durations = np.ones(np.shape(amps)) * durations
-    elif len(durations) != len(amps):
-        raise ValueError(
-            f"Shapes of pulse_amplitude ({pulse_amp.shape}) and "
-            f"pulse_duration ({pulse_duration.shape}) are incompatible."
-        )
+    amps, durations = _broadcast_amp_duration(pulse_amp, pulse_duration)
 
     schedule = Schedule("SNAIL swap", repetitions)
 
@@ -2368,8 +2217,8 @@ def SNAIL_spec_sched(
     spec_pulse_amp: float,
     spec_pulse_duration: float,
     spec_pulse_frequencies: np.ndarray,
-    snail_drive: any,
-    qubit: any,
+    snail_drive: Instrument,
+    qubit: BasicTransmonElement,
     init_duration: float,
     repetitions: int = 1,
 ) -> Schedule:
@@ -2403,62 +2252,11 @@ def SNAIL_spec_sched(
 
     return schedule
     
-# def SNAIL_spec_sched_VNA(
-#     spec_pulse_amp: float,
-#     spec_pulse_duration: float,
-#     spec_pulse_frequencies: np.ndarray,
-#     snail_drive: any,
-#     ro_vna: any,
-#     qubit: any,
-#     init_duration: float,
-#     repetitions: int = 1,
-# ) -> Schedule:
-    
-#     marker_duration = qubit.measure.pulse_duration()+TWPA_RINGUP+TWPA_TAIL
-#     qubit = qubit.name
-    
-#     snail_drive.pulsemod_state('ON')
-#     snail_drive.pulsemod_source('EXT')
-#     snail_drive.pulsemod_trig_mode('EXT')
-#     snail_drive.status('ON')
-
-#     schedule = Schedule("signal generator spectroscopy VNA", repetitions)
-
-#     for i, spec_pulse_freq in enumerate([spec_pulse_frequencies]):
-#         snail_drive.frequency(spec_pulse_freq)
-#         snail_drive.power(spec_pulse_amp)
-        
-#         schedule.add(IdlePulse(duration=init_duration), label=f"buffer {i}")
-
-#         schedule.add(MarkerPulse(
-#                 duration=spec_pulse_duration,
-#                 port="snail:switch",
-#             ),)
-
-#         ro_vna.traces.tr1.run_sweep()
-        
-#         ro_pulse = schedule.add(Measure(qubit, acq_index=i), label=f"Measurement {i}")
-
-#         marker_pulse = schedule.add(
-#             MarkerPulse(
-#                 duration=marker_duration,
-#                 port=qubit + ":switch",
-#             ),
-#             ref_op=ro_pulse,
-#             ref_pt="start",
-#             rel_time=TWPA_DELAY-TWPA_RINGUP,
-#             label=f"TWPA_mark {i})",
-#         )
-
-#         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
-
-#     return schedule
-
 def pump_heterodyne_spec_sched_nco(
     pump_frequency: Union[np.ndarray, float],
     pump_amp: Union[np.ndarray, float],
     pump_duration: Union[np.ndarray, float],
-    snail_drive: any,
+    snail_drive: Instrument,
     pulse_amp: float,
     pulse_duration: float,
     frequencies: np.ndarray,
@@ -2473,23 +2271,7 @@ def pump_heterodyne_spec_sched_nco(
 
     snail_drive.frequency(pump_frequency)
 
-    # ensure pulse_amplitude and pulse_duration are iterable.
-    amps = np.asarray(pump_amp)
-    amps = amps.reshape(amps.shape or (1,))
-    durations = np.asarray(pump_duration)
-    durations = durations.reshape(durations.shape or (1,))
-
-    # either the shapes of the amp and duration must match or one of
-    # them must be a constant floating point value.
-    if len(amps) == 1:
-        amps = np.ones(np.shape(durations)) * amps
-    elif len(durations) == 1:
-        durations = np.ones(np.shape(amps)) * durations
-    elif len(durations) != len(amps):
-        raise ValueError(
-            f"Shapes of pulse_amplitude ({pulse_amp.shape}) and "
-            f"pulse_duration ({pulse_duration.shape}) are incompatible."
-        )
+    amps, durations = _broadcast_amp_duration(pump_amp, pump_duration)
     
     schedule = Schedule("SNAIL pump heterodyne spectroscopy (NCO sweep)(TWPA)", repetitions)
     schedule.add_resource(ClockResource(name=clock, freq=frequencies.flat[0]))
@@ -2562,7 +2344,7 @@ def pump_heterodyne_spec_sched_nco(
 
 def pump_t1_sched(
     times: Union[np.ndarray, float],
-    snail_drive: any,
+    snail_drive: Instrument,
     qubit_specifier: BasicTransmonElement | Iterable[BasicTransmonElement],
     qubit_e: BasicTransmonElement | Iterable[BasicTransmonElement],
     acq_protocol: Literal[
@@ -2616,7 +2398,7 @@ def pump_t1_sched(
 
 def pump_ramsey_sched(
     times: Union[np.ndarray, float],
-    snail_drive: any,
+    snail_drive: Instrument,
     qubit_specifier: BasicTransmonElement | Iterable[BasicTransmonElement],
     qubit_e: BasicTransmonElement | Iterable[BasicTransmonElement],
     artificial_detuning: float = 0,
@@ -2678,7 +2460,7 @@ def pump_ramsey_sched(
 
 def pump_t1_and_t2_sched(
     times: Union[np.ndarray, float],
-    snail_drive: any,
+    snail_drive: Instrument,
     qubit_specifier: BasicTransmonElement | Iterable[BasicTransmonElement],
     qubit_e: BasicTransmonElement | Iterable[BasicTransmonElement],
     case: Union[np.ndarray, int],
@@ -2755,13 +2537,13 @@ def pump_t1_and_t2_sched(
     return schedule
 
 def pump_RPM(
-    qubit: any,
+    qubit: BasicTransmonElement,
     case: int,
     angles: Union[np.ndarray, float],
     pump_frequency: Union[np.ndarray, float],
     pump_amp: Union[np.ndarray, float],
     pump_duration: Union[np.ndarray, float],
-    snail_drive: any,
+    snail_drive: Instrument,
     repetitions: int = 1,
     acq_protocol: Literal[
         "SSBIntegrationComplex", "ThresholdedAcquisition"
