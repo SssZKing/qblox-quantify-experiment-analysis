@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qblox-quantify-experiment-analysis"
+version = "0.1.0"
+description = "Qblox/quantify experiment schedules, calibration nodes and analysis tools (RB, state/process tomography, GST)"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "xarray",
+    "lmfit",
+    "qutip",
+    "pygsti",
+    "scikit-rf",
+    "qcodes",
+    "qblox-instruments",
+    "quantify-core",
+    "quantify-scheduler",
+    "typing_extensions",
+]
+
+[project.optional-dependencies]
+notebooks = ["jupyter", "tqdm"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+snl_qblox = ["PMatrix2.pkl"]
+"snl_qblox.pycqed_randomized_benchmarking" = ["LICENSE.txt", "*.md", "clifford_hash_tables/*.txt"]

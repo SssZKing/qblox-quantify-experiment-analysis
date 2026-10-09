@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.ipynb_checkpoints/
+
+# Raw data and generated outputs (kept out of the repo)
+SNL315/CD1/
+*.csv
+*.npz
+*.hdf5
+*.h5
+*.png
+*.pdf
+SNL315/**/cache/
+SNL315/**/figures/
+SNL315/**/GST_reports/
+SNL315/paper_plots/
+SNL315/**/*.bak*
