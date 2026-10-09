@@ -37,4 +37,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "qqea.schedules" = ["*.md", "clifford/LICENSE.txt", "clifford/clifford_hash_tables/*.txt"]
-"qqea.tomography" = ["PMatrix2.pkl"]
+"qqea.tomography" = ["pmatrix.npy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

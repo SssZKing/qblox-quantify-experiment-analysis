@@ -25,7 +25,12 @@ src/qqea/
         plotting.py, units.py, dataset_info.py, saving.py
         fits.py                   the old helpers namespace, re-exporting all of the above
     tomography/                   analysis: tomography
-        tomography.py             state/process tomography, MLE, chi/unitary extraction, GST datasets
+        state.py                  two-qubit density matrices: linear inversion, MLE
+        process.py                process tomography: linear inversion, CPTP MLE, SPAM correction, fidelities
+        iswap.py                  5-parameter iSWAP model and angle extraction
+        gst.py                    Quantify GST datasets to pyGSTi
+        plotting.py               3D chi-matrix plots
+        tomography.py             the old flat tomography_tools namespace
 ```
 
 This is a layout-only migration. Each module was moved whole from the old Python-Packages folder, and only its imports were changed. Finer splits are done per subpackage.
@@ -40,7 +45,7 @@ This is a layout-only migration. Each module was moved whole from the old Python
 | `simulated_data` | `qqea.experiments.simulated_data` |
 | `helpers` | `qqea.fitting.fits` |
 | `analyzer` | `qqea.fitting.models` |
-| `tomography_tools` | `qqea.tomography.tomography` |
+| `tomography_tools` | `qqea.tomography` (or `qqea.tomography.tomography` for `import *` code) |
 
 ## Install
 
@@ -66,8 +71,17 @@ from qqea.schedules.single_qubit import rabi_sched_TWPA
 from qqea.schedules.two_qubit import randomized_benchmarking_schedule
 from qqea.experiments.calibration_nodes import CalibrationNodes
 from qqea.fitting.fits import t1_and_t2_fit
-from qqea.tomography.tomography import calculate_density_matrix
+from qqea.tomography import calculate_density_matrix, mle_chi_from_p00
 ```
+
+## Tests
+
+```
+pip install pytest
+pytest
+```
+
+Run them in `qblox_dev` after `pip install -e . --no-deps` (they need qutip, scipy, xarray, and pyGSTi/quantify-core for the reference copy of the old modules).
 
 The old `Python-Packages` folder and the notebooks that put it on `sys.path` are not affected.
 
