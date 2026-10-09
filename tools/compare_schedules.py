@@ -238,50 +238,50 @@ def cases():
         ("sweep_optimal", sq, "sweep_optimal_TWPA", lambda e: dict(
             TWPA_pump=e["pump"], TWPA_freq=8e9, TWPA_power=-5.0, pulse_amp=0.1,
             pulse_duration=2e-6, frequencies=ro_freqs, **spec)),
-        ("heterodyne", sq, "heterodyne_spec_sched_nco_TWPA", lambda e: dict(
+        ("heterodyne", sq, "heterodyne_spec_sched_nco", lambda e: dict(
             pulse_amp=0.1, pulse_duration=2e-6, frequencies=ro_freqs, **spec)),
-        ("multiplexed_heterodyne", sq, "multiplexed_heterodyne_spec_sched_nco_TWPA", lambda e: dict(
+        ("multiplexed_heterodyne", sq, "multiplexed_heterodyne_spec_sched_nco", lambda e: dict(
             pulse_amp=0.1, pulse_duration=2e-6, frequencies_qubit1=ro_freqs,
             frequencies_qubit2=lin(7.100e9, 7.102e9, 3), frequencies_idx=np.arange(3),
             acquisition_delay=120e-9, integration_time=1.8e-6,
             ports=["qubit1:res", "qubit2:res"], clocks=["qubit1.ro", "qubit2.ro"])),
-        ("two_tone", sq, "two_tone_spec_sched_nco_TWPA", lambda e: dict(
+        ("two_tone", sq, "two_tone_spec_sched_nco", lambda e: dict(
             spec_pulse_amp=0.05, spec_pulse_duration=10e-6, spec_pulse_port="qubit1:mw",
             spec_pulse_clock="qubit1.01", spec_pulse_frequencies=lin(4.99e9, 5.01e9, 3),
             ro_pulse_amp=0.1, ro_pulse_duration=2e-6, ro_pulse_delay=200e-9,
             ro_pulse_port="qubit1:res", ro_pulse_clock="qubit1.ro", ro_pulse_frequency=7e9,
             ro_acquisition_delay=120e-9, ro_integration_time=1.8e-6, init_duration=10e-6)),
-        ("multiplexed_two_tone", sq, "multiplexed_two_tone_spec_sched_nco_TWPA", lambda e: dict(
+        ("multiplexed_two_tone", sq, "multiplexed_two_tone_spec_sched_nco", lambda e: dict(
             qubits=[e["q1"], e["q2"]], pulse_amp=0.05, pulse_duration=10e-6,
             frequencies_qubit1=lin(4.99e9, 5.01e9, 3), frequencies_qubit2=lin(5.25e9, 5.27e9, 3),
             frequencies_idx=np.arange(3), ro_pulse_delay=200e-9)),
-        ("rabi", sq, "rabi_sched_TWPA", lambda e: dict(
+        ("rabi", sq, "rabi_sched", lambda e: dict(
             pulse_amp=lin(0, 0.5, 3), pulse_duration=40e-9, frequency=5e9, qubit=e["q1"])),
-        ("rabi_amplification", sq, "rabi_amplification_TWPA", lambda e: dict(
+        ("rabi_amplification", sq, "rabi_amplification", lambda e: dict(
             pulse_amp=lin(0.25, 0.35, 3), pulse_duration=40e-9, pi_number=3, frequency=5e9,
             qubit=e["q1"])),
-        ("ramsey", sq, "ramsey_sched_TWPA", lambda e: dict(
+        ("ramsey", sq, "ramsey_sched", lambda e: dict(
             times=times, qubit=e["q1"], artificial_detuning=1e6)),
-        ("stark_ramsey", sq, "stark_ramsey_sched_TWPA", lambda e: dict(
+        ("stark_ramsey", sq, "stark_ramsey_sched", lambda e: dict(
             times=times, qubit=e["q1"], stark_amp=0.1, stark_freq=5.05e9)),
-        ("coupled_ramsey", sq, "coupled_ramsey_sched_TWPA", lambda e: dict(
+        ("coupled_ramsey", sq, "coupled_ramsey_sched", lambda e: dict(
             times=times, qubit=e["q1"], qubit_c=e["q2"])),
-        ("coupled_phase_ramsey", sq, "coupled_phase_ramsey_sched_TWPA", lambda e: dict(
+        ("coupled_phase_ramsey", sq, "coupled_phase_ramsey_sched", lambda e: dict(
             phases=lin(0, 360, 3), qubit=e["q1"], qubit_c=e["q2"])),
-        ("echo", sq, "echo_sched_TWPA", lambda e: dict(times=times, qubit=e["q1"])),
-        ("t1", sq, "t1_sched_TWPA", lambda e: dict(times=times, qubit=e["q1"])),
+        ("echo", sq, "echo_sched", lambda e: dict(times=times, qubit=e["q1"])),
+        ("t1", sq, "t1_sched", lambda e: dict(times=times, qubit=e["q1"])),
     ]
     for case in (1, 2, 3):
         c += [
-            (f"t1_and_t2_case{case}", sq, "t1_and_t2_TWPA", lambda e, case=case: dict(
+            (f"t1_and_t2_case{case}", sq, "t1_and_t2", lambda e, case=case: dict(
                 times=times, qubit=e["q1"], case=case, artificial_detuning=1e6)),
-            (f"multi_qubit_t1_and_t2_case{case}", sq, "multi_qubit_t1_and_t2_TWPA",
+            (f"multi_qubit_t1_and_t2_case{case}", sq, "multi_qubit_t1_and_t2",
              lambda e, case=case: dict(times=times, qubit_specifier=[e["q1"], e["q2"]], case=case)),
         ]
     c += [
-        ("multiplexed_readout_calibration", sq, "multiplexed_readout_calibration_sched_TWPA",
+        ("multiplexed_readout_calibration", sq, "multiplexed_readout_calibration_sched",
          lambda e: dict(qubits=[e["q1"], e["q2"]], prepared_states=[0, 1])),
-        ("readout_calibration", sq, "readout_calibration_sched_TWPA", lambda e: dict(
+        ("readout_calibration", sq, "readout_calibration_sched", lambda e: dict(
             qubit=e["q1"], prepared_states=[0, 1, 2])),
         ("readout_freq_optimization", sq, "readout_freq_optimization_TWPA", lambda e: dict(
             qubit=e["q1"], frequencies=lin(7.000e9, 7.001e9, 2), instrument_coordinator=e["ic"],
@@ -292,52 +292,52 @@ def cases():
             qubit=e["q1"], lens=[1e-6, 2e-6], instrument_coordinator=e["ic"], quantum_device=e["qd"])),
         ("readout_weight_optimization", sq, "readout_weight_optimization_TWPA", lambda e: dict(
             qubit=e["q1"], instrument_coordinator=e["ic"], quantum_device=e["qd"])),
-        ("allxy", sq, "allxy_sched_TWPA", lambda e: dict(qubit=e["q1"])),
+        ("allxy", sq, "allxy_sched", lambda e: dict(qubit=e["q1"])),
         ("drag_calibration", sq, "DRAG_calibration_sched", lambda e: dict(
             qubit=e["q1"], motzoi_list=lin(-0.1, 0.1, 3), instrument_coordinator=e["ic"],
             quantum_device=e["qd"])),
-        ("dressed_e_cavity", sq, "dressed_e_cavity_TWPA", lambda e: dict(
+        ("dressed_e_cavity", sq, "dressed_e_cavity", lambda e: dict(
             pulse_amp=0.1, pulse_duration=2e-6, frequencies=ro_freqs, qubit="qubit1", **spec)),
-        ("f_state_spec", sq, "f_state_spec_sched_nco_TWPA", lambda e: dict(
+        ("f_state_spec", sq, "f_state_spec_sched_nco", lambda e: dict(
             spec_pulse_amp=0.05, spec_pulse_duration=10e-6, spec_pulse_port="qubit1:fs",
             spec_pulse_clock="qubit1.12", spec_pulse_frequencies=lin(4.79e9, 4.81e9, 3),
             qubit=e["q1"])),
-        ("f_state_rabi", sq, "f_state_rabi_sched_TWPA", lambda e: dict(
+        ("f_state_rabi", sq, "f_state_rabi_sched", lambda e: dict(
             pulse_amp=lin(0, 0.5, 3), pulse_duration=400e-9, frequency=4.8e9, qubit=e["q1"])),
-        ("f_state_cavity", sq, "f_state_cavity_TWPA", lambda e: dict(
+        ("f_state_cavity", sq, "f_state_cavity", lambda e: dict(
             pulse_amp=0.1, pulse_duration=2e-6, frequencies=ro_freqs, qubit="qubit1", **spec)),
-        ("f_state_t1_case1", sq, "f_state_t1_TWPA", lambda e: dict(times=times, qubit=e["q1"], case=1)),
-        ("f_state_t1_case2", sq, "f_state_t1_TWPA", lambda e: dict(times=times, qubit=e["q1"], case=2)),
-        ("multiplex_IQ", sq, "multiplex_IQ_TWPA", lambda e: dict(
+        ("f_state_t1_case1", sq, "f_state_t1", lambda e: dict(times=times, qubit=e["q1"], case=1)),
+        ("f_state_t1_case2", sq, "f_state_t1", lambda e: dict(times=times, qubit=e["q1"], case=2)),
+        ("multiplex_IQ", sq, "multiplex_IQ", lambda e: dict(
             qubit=e["q1"], prepared_states=[0, 1, 2], multiplexing_freq=[7.000e9, 7.001e9, 7.002e9])),
-        ("RO_raw_trace", sq, "RO_raw_trace_TWPA", lambda e: dict(
+        ("RO_raw_trace", sq, "RO_raw_trace", lambda e: dict(
             qubit=e["q1"], trace_time=2e-6, prepared_states=[0, 1, 2],
             multiplexing_freq=[7.000e9, 7.001e9, 7.002e9])),
-        ("rabi_population_case1", sq, "rabi_population_TWPA", lambda e: dict(
+        ("rabi_population_case1", sq, "rabi_population", lambda e: dict(
             qubit=e["q1"], case=1, angles=lin(0, 180, 3))),
-        ("rabi_population_case2", sq, "rabi_population_TWPA", lambda e: dict(
+        ("rabi_population_case2", sq, "rabi_population", lambda e: dict(
             qubit=e["q1"], case=2, angles=lin(0, 180, 3))),
-        ("snail_swap", sq, "SNAIL_swap_sched_TWPA", lambda e: dict(
+        ("snail_swap", sq, "SNAIL_swap_sched", lambda e: dict(
             pulse_frequency=6e9, pulse_amp=np.array([-10.0, -5.0]), pulse_duration=200e-9,
             snail_drive=e["snail"], qubit_specifier=[e["q1"], e["q2"]], qubit_e=[e["q1"]],
             swap_type="iSWAP")),
-        ("snail_spec", sq, "SNAIL_spec_sched_TWPA", lambda e: dict(
+        ("snail_spec", sq, "SNAIL_spec_sched", lambda e: dict(
             spec_pulse_amp=-10.0, spec_pulse_duration=2e-6, spec_pulse_frequencies=lin(6e9, 6.01e9, 3),
             snail_drive=e["snail"], qubit=e["q1"], init_duration=10e-6)),
-        ("pump_heterodyne", sq, "pump_heterodyne_spec_sched_nco_TWPA", lambda e: dict(
+        ("pump_heterodyne", sq, "pump_heterodyne_spec_sched_nco", lambda e: dict(
             pump_frequency=6e9, pump_amp=-10.0, pump_duration=200e-9, snail_drive=e["snail"],
             pulse_amp=0.1, pulse_duration=2e-6, frequencies=ro_freqs, **spec)),
-        ("pump_t1", sq, "pump_t1_sched_TWPA", lambda e: dict(
+        ("pump_t1", sq, "pump_t1_sched", lambda e: dict(
             times=times, snail_drive=e["snail"], qubit_specifier=[e["q1"], e["q2"]], qubit_e=[e["q1"]])),
-        ("pump_ramsey", sq, "pump_ramsey_sched_TWPA", lambda e: dict(
+        ("pump_ramsey", sq, "pump_ramsey_sched", lambda e: dict(
             times=times, snail_drive=e["snail"], qubit_specifier=[e["q1"], e["q2"]], qubit_e=[e["q1"]])),
-        ("pump_t1_and_t2_case1", sq, "pump_t1_and_t2_sched_TWPA", lambda e: dict(
+        ("pump_t1_and_t2_case1", sq, "pump_t1_and_t2_sched", lambda e: dict(
             times=times, snail_drive=e["snail"], qubit_specifier=[e["q1"], e["q2"]],
             qubit_e=[e["q1"]], case=1)),
-        ("pump_RPM", sq, "pump_RPM_TWPA", lambda e: dict(
+        ("pump_RPM", sq, "pump_RPM", lambda e: dict(
             qubit=e["q1"], case=1, angles=lin(0, 180, 3), pump_frequency=6e9, pump_amp=-10.0,
             pump_duration=200e-9, snail_drive=e["snail"])),
-        ("cavity_charging", sq, "cavity_charging_TWPA", lambda e: dict(
+        ("cavity_charging", sq, "cavity_charging", lambda e: dict(
             qubit=e["q1"], pulse_amp=[0.1, 0.2], frequency=7e9, port="qubit1:res", clock="qubit1.ro")),
     ]
 
@@ -467,7 +467,9 @@ def dump(src, out, snapshot, only):
         }
         entry = {"function": f"{module}.{func}"}
         try:
-            value = getattr(mod, func)(**make_kwargs(env))
+            # The baseline predates the rename that dropped the _TWPA suffix.
+            fn = getattr(mod, func, None) or getattr(mod, func + "_TWPA")
+            value = fn(**make_kwargs(env))
             schedules = list(env["ic"].compiled)
             if isinstance(value, ScheduleBase):
                 compiled = SerialCompiler(name="compare").compile(

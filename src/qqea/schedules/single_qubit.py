@@ -2862,39 +2862,3 @@ def cavity_charging(
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
         
     return schedule
-
-
-# Old names, kept so existing notebooks and calibration_nodes keep working.
-heterodyne_spec_sched_nco_TWPA = heterodyne_spec_sched_nco
-multiplexed_heterodyne_spec_sched_nco_TWPA = multiplexed_heterodyne_spec_sched_nco
-two_tone_spec_sched_nco_TWPA = two_tone_spec_sched_nco
-multiplexed_two_tone_spec_sched_nco_TWPA = multiplexed_two_tone_spec_sched_nco
-rabi_sched_TWPA = rabi_sched
-rabi_amplification_TWPA = rabi_amplification
-ramsey_sched_TWPA = ramsey_sched
-stark_ramsey_sched_TWPA = stark_ramsey_sched
-coupled_ramsey_sched_TWPA = coupled_ramsey_sched
-coupled_phase_ramsey_sched_TWPA = coupled_phase_ramsey_sched
-echo_sched_TWPA = echo_sched
-t1_sched_TWPA = t1_sched
-t1_and_t2_TWPA = t1_and_t2
-multi_qubit_t1_and_t2_TWPA = multi_qubit_t1_and_t2
-multiplexed_readout_calibration_sched_TWPA = multiplexed_readout_calibration_sched
-readout_calibration_sched_TWPA = readout_calibration_sched
-allxy_sched_TWPA = allxy_sched
-dressed_e_cavity_TWPA = dressed_e_cavity
-f_state_spec_sched_nco_TWPA = f_state_spec_sched_nco
-f_state_rabi_sched_TWPA = f_state_rabi_sched
-f_state_cavity_TWPA = f_state_cavity
-f_state_t1_TWPA = f_state_t1
-multiplex_IQ_TWPA = multiplex_IQ
-RO_raw_trace_TWPA = RO_raw_trace
-rabi_population_TWPA = rabi_population
-SNAIL_swap_sched_TWPA = SNAIL_swap_sched
-SNAIL_spec_sched_TWPA = SNAIL_spec_sched
-pump_heterodyne_spec_sched_nco_TWPA = pump_heterodyne_spec_sched_nco
-pump_t1_sched_TWPA = pump_t1_sched
-pump_ramsey_sched_TWPA = pump_ramsey_sched
-pump_t1_and_t2_sched_TWPA = pump_t1_and_t2_sched
-pump_RPM_TWPA = pump_RPM
-cavity_charging_TWPA = cavity_charging
