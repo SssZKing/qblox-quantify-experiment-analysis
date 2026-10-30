@@ -36,7 +36,7 @@ class ReadoutNodes(NodeBase):
 
     @node
     def readout_calibration(self, qubit: BasicTransmonElement, num_points=6000,
-                            fidelity_threshold=0.9, plot=False, update=True):
+                            fidelity_threshold=0.9, plot=False, update=True, relevel_pump=True):
         """Calibrate the readout threshold and rotation via an IQ-blob measurement.
 
         Prepares the qubit in |0> and |1> ``num_points`` times each, fits the two
@@ -57,14 +57,21 @@ class ReadoutNodes(NodeBase):
         update : bool, optional
             Whether to write the fitted threshold/rotation back to the qubit
             on success (default True).
+        relevel_pump : bool, optional
+            Re-send the TWPA pump power and check its error queue first
+            (default True; needs ``twpa_pump`` on the instance, else skipped).
 
         Returns
         -------
         (bool, float or None)
             ``(True, avg_fidelity)`` if the fidelity gate passes, else
-            ``(False, None)``. On success, if ``update`` is True, the qubit's
-            acq_threshold and acq_rotation are updated in place.
+            ``(False, None)`` (also when the TWPA pump fails to re-level).
+            On success, if ``update`` is True, the qubit's acq_threshold and
+            acq_rotation are updated in place.
         """
+        if relevel_pump and not self._relevel_twpa_pump():
+            return False, None
+
         states = batched_parameter("states", batch_size=600)
         ro_cali_sched_kwargs = {
             "qubit": qubit,
@@ -106,7 +113,7 @@ class ReadoutNodes(NodeBase):
 
     @node
     def multiplexed_readout_calibration(self, qubits: Iterable[BasicTransmonElement], num_points=6000,
-                                        fidelity_threshold=0.9, plot=False, update=True):
+                                        fidelity_threshold=0.9, plot=False, update=True, relevel_pump=True):
         """Calibrate readout threshold/rotation for several qubits read out at once.
 
         Runs a single multiplexed IQ-blob measurement, mapping each qubit to its
@@ -128,6 +135,9 @@ class ReadoutNodes(NodeBase):
         update : bool, optional
             Whether to write the fitted threshold/rotation back to each
             passing qubit (default True).
+        relevel_pump : bool, optional
+            Re-send the TWPA pump power and check its error queue first
+            (default True; needs ``twpa_pump`` on the instance, else skipped).
 
         Returns
         -------
@@ -135,9 +145,12 @@ class ReadoutNodes(NodeBase):
             ``(all_ok, {name: fidelity, ...})``. ``all_ok`` is True only if every
             qubit passes the fidelity gate; the dict always reports each qubit's
             fidelity. Only qubits that pass have their readout params updated,
-            and only if ``update`` is True.
+            and only if ``update`` is True. If the TWPA pump fails to re-level,
+            returns ``(False, {name: None, ...})`` without measuring.
         """
         qubits = list(qubits)
+        if relevel_pump and not self._relevel_twpa_pump():
+            return False, {q.name: None for q in qubits}
         self._assign_acq_channels(qubits)
 
         states = batched_parameter("states", batch_size=600)

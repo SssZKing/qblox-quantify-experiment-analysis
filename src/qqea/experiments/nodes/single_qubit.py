@@ -40,7 +40,8 @@ class SingleQubitNodes(NodeBase):
 
     @node
     def resonator_calibration(self, qubit: BasicTransmonElement, frequency_setpoints=None,
-                              amp=0.2, duration=5e-6, repetitions=100, plot=False, update=True):
+                              amp=0.2, duration=5e-6, repetitions=100, plot=False, update=True,
+                              relevel_pump=True):
         """Calibrate the resonator frequency of a qubit via spectroscopy.
 
         Parameters
@@ -61,14 +62,21 @@ class SingleQubitNodes(NodeBase):
         update : bool, optional
             Whether to write the fitted frequency back to the qubit on
             success (default True).
+        relevel_pump : bool, optional
+            Re-send the TWPA pump power and check its error queue first
+            (default True; needs ``twpa_pump`` on the instance, else skipped).
 
         Returns
         -------
         (bool, float or None)
             ``(True, resonator_freq)`` on a successful fit, else
-            ``(False, None)``. On success, if ``update`` is True, the qubit's
-            readout clock frequency is updated in place.
+            ``(False, None)`` (also when the TWPA pump fails to re-level).
+            On success, if ``update`` is True, the qubit's readout clock
+            frequency is updated in place.
         """
+        if relevel_pump and not self._relevel_twpa_pump():
+            return False, None
+
         if frequency_setpoints is None:
             freq_center = qubit.clock_freqs.readout()
             frequency_setpoints = np.linspace(freq_center - 2e6, freq_center + 2e6, 800)

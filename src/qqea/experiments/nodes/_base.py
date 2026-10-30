@@ -8,6 +8,7 @@ are only written when ``ok`` is True and ``update`` is True.
 
 import contextlib
 import functools
+import time
 import warnings
 from datetime import datetime
 
@@ -81,13 +82,54 @@ def batched_parameter(name, unit="", label=None, batch_size=None):
 class NodeBase:
     """Holds the runtime instruments shared by every node."""
 
-    def __init__(self, quantum_device, meas_ctrl, acq_delay, instrument_coordinator=None):
+    def __init__(self, quantum_device, meas_ctrl, acq_delay, instrument_coordinator=None,
+                 twpa_pump=None):
         self.quantum_device = quantum_device
         self.meas_ctrl = meas_ctrl
         self.acq_delay = acq_delay
         self.instrument_coordinator = instrument_coordinator
+        self.twpa_pump = twpa_pump
+        self._twpa_skip_noted = False
         self.history = []
         self._tuids = []
+
+    # ------------------------------------------------------------------
+    # TWPA pump
+    # ------------------------------------------------------------------
+    def _relevel_twpa_pump(self, retries=1):
+        """Re-send the TWPA pump power (forces its level calibration) and check the error queue.
+
+        Returns
+        -------
+        bool
+            True if the pump re-levelled without a +610 "Track and hold failed" error
+            (or no pump was given), False if the error persists after ``retries``
+            extra attempts.
+        """
+        pump = getattr(self, "twpa_pump", None)              # getattr: instances built before this attribute existed
+        if pump is None:
+            if not getattr(self, "_twpa_skip_noted", False):
+                print("No twpa_pump given to CalibrationNodes: skipping the TWPA pump re-level.")
+                self._twpa_skip_noted = True
+            return True
+        for attempt in range(retries + 1):
+            pump.write(f"POW {float(pump.ask('POW?'))}")   # same as HP83732B.relevel(); works with older driver classes
+            time.sleep(0.5)                                # ~30 ms level calibration (+70 ms with power protection)
+            errs = []
+            for _ in range(20):
+                e = pump.ask("SYST:ERR?").strip()
+                if e.lstrip("+").startswith("0"):
+                    break
+                errs.append(e)
+            failed = [e for e in errs if e.lstrip("+").startswith("610")]
+            other = [e for e in errs if not e.lstrip("+").startswith("610") and not e.startswith("-420")]
+            if other:
+                print(f"TWPA pump error queue: {other}")
+            if not failed:
+                return True
+            print(f"TWPA pump re-level failed (attempt {attempt + 1}/{retries + 1}): {failed}")
+        print("TWPA pump is not levelled; not calibrating. Check the pump (power, pulse mode, output).")
+        return False
 
     # ------------------------------------------------------------------
     # running

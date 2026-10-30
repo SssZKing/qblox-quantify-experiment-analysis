@@ -262,3 +262,53 @@ def test_a_fit_that_raises_on_bad_data_is_a_failed_node(monkeypatch):
     assert nodes.drag_calibration(qubit) == (False, None)
     assert qubit.rxy.motzoi() == 0.03
     assert nodes.history[-1]["ok"] is False and "error" not in nodes.history[-1]
+
+
+class FakePump:
+    """HP 83732B stand-in: answers POW? and queues one scripted error per re-level."""
+
+    def __init__(self, failures=0):
+        self.failures = failures  # how many re-levels end in +610
+        self.queue = []
+        self.writes = []
+
+    def ask(self, cmd):
+        if cmd == "POW?":
+            return "+5.00000000E+000"
+        if cmd == "SYST:ERR?":
+            return self.queue.pop(0) if self.queue else '+0,"No error"'
+        raise AssertionError(cmd)
+
+    def write(self, cmd):
+        self.writes.append(cmd)
+        if self.failures:
+            self.failures -= 1
+            self.queue.append('+610,"Track and hold failed, level is invalid"')
+
+
+@pytest.fixture
+def no_sleep(monkeypatch):
+    monkeypatch.setattr(_base.time, "sleep", lambda s: None)
+
+
+def test_readout_calibration_stops_when_the_twpa_pump_does_not_relevel(no_sleep, fake_gettable):
+    meas_ctrl = FakeMeasCtrl()
+    pump = FakePump(failures=6)
+    nodes = make_nodes(meas_ctrl, twpa_pump=pump)
+    assert nodes.readout_calibration(FakeQubit()) == (False, None)
+    assert pump.writes == ["POW 5.0", "POW 5.0"]  # one retry, then give up
+    assert meas_ctrl.runs == []
+    ok, fids = nodes.multiplexed_readout_calibration([FakeQubit("q1"), FakeQubit("q2")])
+    assert (ok, fids) == (False, {"q1": None, "q2": None})
+    assert nodes.resonator_calibration(FakeQubit()) == (False, None)
+    assert meas_ctrl.runs == []
+
+
+def test_twpa_relevel_passes_after_a_retry_and_without_a_pump(no_sleep, capsys):
+    pump = FakePump(failures=1)
+    assert make_nodes(twpa_pump=pump)._relevel_twpa_pump() is True
+    assert len(pump.writes) == 2
+    nodes = make_nodes()
+    assert nodes._relevel_twpa_pump() is True
+    assert nodes._relevel_twpa_pump() is True
+    assert capsys.readouterr().out.count("skipping the TWPA pump re-level") == 1

@@ -15,6 +15,13 @@ instrument coordinator directly instead of going through ``meas_ctrl``
 (``drag_calibration`` and the ``ro_*_optimization``/``ro_weight_calibration``
 nodes); it can be omitted if you never call those.
 
+``twpa_pump`` (the HP 83732B TWPA pump, e.g. ``hp_ssg``) is optional. When given,
+``resonator_calibration``, ``readout_calibration`` and
+``multiplexed_readout_calibration`` first re-send the pump power, which makes the
+generator redo its level calibration, and check its error queue for +610 "Track and
+hold failed" (a stale/invalid held level leaves the TWPA unpumped or wrongly pumped
+without setting any status bit). Without it those nodes skip the re-level.
+
 The ``qubit`` object stays a per-call argument since it changes between nodes.
 
 Every node returns ``(ok, value)`` and does not raise on a bad fit. Each call
@@ -44,4 +51,6 @@ class CalibrationNodes(SingleQubitNodes, ReadoutNodes, IswapStarkNodes, RoadmapN
         Acquisition delay (time of flight) in seconds, used by resonator spectroscopy.
     instrument_coordinator : InstrumentCoordinator, optional
         Needed only by the nodes that bypass ``meas_ctrl``.
+    twpa_pump : HP83732B, optional
+        The TWPA pump, re-levelled before the resonator and readout calibrations.
     """
