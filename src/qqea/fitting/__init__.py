@@ -2,5 +2,6 @@
 
 Topic modules: ``readout``, ``single_qubit``, ``two_qubit``, ``iswap_exchange``, ``rb``, ``models``,
 ``plotting``, ``units``, ``dataset_info``, ``saving``. ``fits`` re-exports all of
-them under the old ``helpers`` names.
+them under the old ``helpers`` names. ``ntwk_fit`` (VNA resonator fits) is a
+separate module, as it was in the lab code.
 """

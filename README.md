@@ -27,13 +27,15 @@ src/qqea/
         saving.py                 save raw retrieve_acquisition() data as a quantify dataset
         datadir.py                set_datadir_from_env(): data directory from QBLOX_DATADIR
         hp83732b.py               qcodes driver for the HP 83732B signal generator (TWPA pump)
+        dg645.py                  qcodes driver for the SRS DG645 delay generator (gated SNAIL pump)
         simulated_data.py         simulated datasets for dry runs
         dry_run.py                run the nodes on a dummy cluster (qblox_dev only)
     fitting/                      analysis: fitting and plotting
         readout.py                g/e discrimination, readout freq/amp/duration optimization, weights
         single_qubit.py           Ramsey chevron, conditional Ramsey, Rabi amplification, T1/T2, DRAG
         two_qubit.py              iSWAP chevron, theta_p, RPE
-        rb.py                     rb_simple_fit and RBAnalysis
+        rb.py                     rb_simple_fit (with bootstrap errors) and RBAnalysis
+        ntwk_fit.py               notch-resonator S21 fits on scikit-rf networks (delay removal, DCM)
         models.py                 extra lmfit models (beating decay, multi-Lorentzian, iSWAP exchange)
         iswap_exchange.py         iSWAP population exchange in T1, Tphi, t_iSWAP; iSWAP gate-error budget
         plotting.py, units.py, dataset_info.py, saving.py
@@ -60,6 +62,8 @@ set_twpa_pump(qubit2, False)
 
 The iSWAP edge now ships in the package: `from qqea.schedules.edges import CompositeiSWAPEdge`.
 
+The iSWAP timing knobs are module attributes read at call time, so set them on the module that defines them, not on the names `two_qubit` re-exports: `qqea.schedules.gates.ISWAP_LEAD` (RF lead before each iSWAP, 40 ns), `gates.ISWAP_DG645` (DG645-gated pump trains in GST, off by default) and `qqea.schedules.phase.ISWAP_CONTEXT_PHASE` (back-to-back iSWAP phase compensation in GST, off by default).
+
 Old imports map to new ones as follows:
 
 | Old import | New import |
@@ -69,6 +73,8 @@ Old imports map to new ones as follows:
 | `pycqed_randomized_benchmarking.clifford_group` | `qqea.schedules.clifford.clifford_group` |
 | `calibration_nodes` | `qqea.experiments.calibration_nodes` |
 | `HP83732B` | `qqea.experiments.hp83732b` |
+| `DG645` | `qqea.experiments.dg645` |
+| `ntwk_fit` | `qqea.fitting.ntwk_fit` |
 | `simulated_data` | `qqea.experiments.simulated_data` |
 | `helpers` | `qqea.fitting.fits` |
 | `analyzer` | `qqea.fitting.models` |
