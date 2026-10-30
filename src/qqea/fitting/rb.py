@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from xarray import Dataset
 
 
-def rb_simple_fit(dataset, plot=True):
+def rb_simple_fit(dataset, plot=True, return_err=False, n_boot=1000, seed=0):
     """Single-qubit gate fidelity from an RB dataset, fit straight from IQ data.
 
     ``dataset`` (or its tuid) has x0 = number of Cliffords, x1 = seed and one
@@ -31,10 +31,15 @@ def rb_simple_fit(dataset, plot=True):
     seed-averaged ground population is fit with ``0.5 * alpha**m + 0.5``.
     Gate fidelity assumes 1.875 physical gates per Clifford.
 
+    With ``return_err=True`` also returns the 1-sigma uncertainty of each
+    fidelity, from a bootstrap over the random sequences (resample the seeds
+    with replacement ``n_boot`` times and refit; ``seed`` seeds the resampling).
+
     Returns
     -------
-    list of float or None
-        Gate fidelity per qubit, or ``None`` if the dataset has neither 2 nor 4
+    list of float, (list of float, list of float), or None
+        Gate fidelity per qubit, plus the list of their uncertainties when
+        ``return_err`` is True, or ``None`` if the dataset has neither 2 nor 4
         data variables.
     """
     if isinstance(dataset, str):
@@ -59,6 +64,8 @@ def rb_simple_fit(dataset, plot=True):
         return
     
     gate_fid_arr = []
+    gate_fid_err_arr = []
+    rng = np.random.default_rng(seed)
     for idx, (y_amp, y_phase, label) in enumerate(y_vars):
         def rb_decay(
             m: int,
@@ -110,6 +117,15 @@ def rb_simple_fit(dataset, plot=True):
         print(f"{label} single gate fidelity: {gate_fid:.4f}")
         gate_fid_arr.append(gate_fid)
 
+        if return_err:
+            boot = []
+            for _ in range(n_boot):
+                pick = rng.integers(0, num_runs.size, num_runs.size)
+                p_b, _ = curve_fit(rb_decay, num_gates[:-2], g_popu_full[pick].mean(axis=0),
+                                   p0=[popt[0]])
+                boot.append(rb_fidelity(p_b[0])[1])
+            gate_fid_err_arr.append(np.std(boot, ddof=1))
+
         if plot:
             ax = axs[idx]
             ax.plot(num_gates[:-2], g_popu_full.T, '.', c='grey', alpha=0.5)
@@ -126,6 +142,8 @@ def rb_simple_fit(dataset, plot=True):
     if plot:
         plt.tight_layout()
         plt.show()
+    if return_err:
+        return gate_fid_arr, gate_fid_err_arr
     return gate_fid_arr
 
 

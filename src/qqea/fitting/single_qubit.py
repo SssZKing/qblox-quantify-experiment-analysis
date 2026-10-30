@@ -407,20 +407,24 @@ def t1_and_t2_fit(dataset, r_squared=0.8):
 def linear(x, a, b):
     return a * x + b
 
-def DRAG_fit(dataset, motzoi_list, plot=True):
+def DRAG_fit(dataset, motzoi_list, plot=True, r2_threshold=0.9):
     """Find the optimal DRAG motzoi coefficient from an AllXY-style calibration.
 
     Two AllXY sequences ([(180,0),(90,90)] and [(180,90),(90,0)]) are swept over
     motzoi; each is equally sensitive to phase errors but with opposite sign, so
     their readout-signal difference is linear in motzoi and crosses zero at the
     motzoi that cancels the phase error. Real and imaginary parts are fit
-    independently and their intersection is taken as the optimal motzoi.
+    independently. The readout rotation can put all of the signal in one
+    quadrature, leaving the other flat noise, so the fit succeeds as long as
+    one quadrature has R^2 > ``r2_threshold``: if both pass, the intersection
+    of the two lines is the optimal motzoi; if only one passes, its zero
+    crossing is used.
 
     Returns
     -------
     float or None
-        The optimal motzoi coefficient, or ``None`` if either linear fit is
-        untrustworthy (so callers should skip updating rxy.motzoi).
+        The optimal motzoi coefficient, or ``None`` if neither linear fit is
+        trustworthy (so callers should skip updating rxy.motzoi).
     """
     motzoi_list = np.asarray(motzoi_list, dtype=float)
     g0 = dataset[list(dataset.data_vars)[0]].values[0::2]
@@ -438,31 +442,46 @@ def DRAG_fit(dataset, motzoi_list, plot=True):
     r2_real = r_squared(diff.real, linear(motzoi_list, *popt1))
     r2_imag = r_squared(diff.imag, linear(motzoi_list, *popt2))
 
-    # Get intersection point
     a1, b1 = popt1
     a2, b2 = popt2
-    optimal_motzoi = (b2 - b1) / (a1 - a2)
+    real_ok = r2_real > r2_threshold
+    imag_ok = r2_imag > r2_threshold
+    if real_ok and imag_ok:
+        # Get intersection point
+        optimal_motzoi = (b2 - b1) / (a1 - a2)
+        used = 'intersection'
+    elif real_ok:
+        optimal_motzoi = -b1 / a1
+        used = 'real zero crossing'
+    elif imag_ok:
+        optimal_motzoi = -b2 / a2
+        used = 'imag zero crossing'
+    else:
+        optimal_motzoi = np.nan
+        used = 'none'
 
     if plot:
         plt.plot(motzoi_list, np.real(diff), label='real', c='C0')
         plt.plot(motzoi_list, np.imag(diff), label='imag', c='C1')
         plt.plot(motzoi_list, linear(motzoi_list, *popt1), label='Fit Real', linestyle='--', c='C0')
         plt.plot(motzoi_list, linear(motzoi_list, *popt2), label='Fit Imag', linestyle='--', c='C1')
-        plt.axvline(optimal_motzoi, color='red', linestyle=':', label=f'Optimal Motzoi: {optimal_motzoi:.3f}')
+        if np.isfinite(optimal_motzoi):
+            plt.axvline(optimal_motzoi, color='red', linestyle=':', label=f'Optimal Motzoi: {optimal_motzoi:.3f}')
+        plt.axhline(0, color='gray', lw=0.5)
         plt.legend()
         plt.title('DRAG Calibration Fit')
         plt.xlabel('Motzoi Coefficient')
         plt.ylabel('Difference in Readout Signal')
         plt.show()
 
-    fit_ok = np.isfinite(optimal_motzoi) and r2_real > 0.8 and r2_imag > 0.8
+    fit_ok = np.isfinite(optimal_motzoi)
 
     if not fit_ok:
         print(f'DRAG fit failed (R^2_real={r2_real:.3f}, R^2_imag={r2_imag:.3f}, '
-              f'motzoi={optimal_motzoi:.4f}). Motzoi not updated.')
+              f'both <= {r2_threshold}). Motzoi not updated.')
         return None
 
-    print(f'Optimal motzoi = {optimal_motzoi:.4f}  '
+    print(f'Optimal motzoi = {optimal_motzoi:.4f}  from {used}  '
           f'(R^2_real={r2_real:.3f}, R^2_imag={r2_imag:.3f})')
 
     return optimal_motzoi

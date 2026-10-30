@@ -13,6 +13,7 @@ import xarray as xr
 
 from qqea.fitting import fits
 from qqea.fitting.models import DoubleLorentzianModel, double_lorentzian_func
+from qqea.fitting.rb import rb_simple_fit
 from qqea.fitting.readout import (
     IQ_blob_SNR,
     RO_amp_fit,
@@ -141,6 +142,61 @@ def test_drag_fit_finds_zero_crossing():
     interleaved[0::2], interleaved[1::2] = g0, g1
     ds = xr.Dataset({"y0": ("acq", interleaved)})
     assert DRAG_fit(ds, list(motzoi), plot=False) == pytest.approx(m0, abs=0.02)
+
+
+def _drag_dataset(diff, rng):
+    g1 = rng.normal(0, 1, diff.size) + 1j * rng.normal(0, 1, diff.size)
+    interleaved = np.empty(2 * diff.size, complex)
+    interleaved[0::2], interleaved[1::2] = g1 + diff, g1
+    return xr.Dataset({"y0": ("acq", interleaved)})
+
+
+def test_drag_fit_uses_the_one_good_quadrature():
+    # all of the signal in the real part, the imaginary part is flat noise
+    rng = np.random.default_rng(RNG_SEED)
+    motzoi = np.linspace(-1, 1, 21)
+    m0 = -0.31
+    diff = (motzoi - m0) + 1j * rng.normal(0, 0.01, motzoi.size)
+    assert DRAG_fit(_drag_dataset(diff, rng), motzoi, plot=False) == pytest.approx(m0, abs=0.02)
+    diff = 1j * (motzoi - m0) + rng.normal(0, 0.01, motzoi.size)
+    assert DRAG_fit(_drag_dataset(diff, rng), motzoi, plot=False) == pytest.approx(m0, abs=0.02)
+
+
+def test_drag_fit_without_a_good_quadrature_returns_none():
+    rng = np.random.default_rng(RNG_SEED)
+    motzoi = np.linspace(-1, 1, 21)
+    diff = rng.normal(0, 1, motzoi.size) + 1j * rng.normal(0, 1, motzoi.size)
+    assert DRAG_fit(_drag_dataset(diff, rng), motzoi, plot=False) is None
+
+
+def _rb_dataset(rng, alpha, lengths, n_seeds, noise):
+    # x1 (seed) outer, x0 inner; the last two x0 values are the |g> and |e> calibration points
+    x0 = np.array(list(lengths) + [lengths[-1] + 1, lengths[-1] + 2])
+    g_iq, e_iq = 1.0 + 0.2j, -0.5 + 1.0j
+    xs0, xs1, iq = [], [], []
+    for seed in range(n_seeds):
+        p_e = 0.5 - 0.5 * alpha ** np.asarray(lengths, float) + rng.normal(0, noise, len(lengths))
+        iq += list(g_iq + p_e * (e_iq - g_iq)) + [g_iq, e_iq]
+        xs0 += list(x0)
+        xs1 += [seed] * x0.size
+    iq = np.array(iq)
+    return xr.Dataset(
+        {"y0": ("dim_0", np.abs(iq)), "y1": ("dim_0", np.rad2deg(np.angle(iq)))},
+        coords={"x0": ("dim_0", xs0), "x1": ("dim_0", xs1)},
+    )
+
+
+def test_rb_simple_fit_bootstrap_error():
+    rng = np.random.default_rng(RNG_SEED)
+    alpha = 0.99
+    ds = _rb_dataset(rng, alpha, [1, 5, 10, 20, 50, 100, 200], n_seeds=20, noise=0.02)
+    f_gate = 1 - (1 - (1 + alpha) / 2) / 1.875
+    fids = rb_simple_fit(ds, plot=False)
+    fids_err, errs = rb_simple_fit(ds, plot=False, return_err=True, n_boot=200)
+    assert fids_err == fids
+    assert fids[0] == pytest.approx(f_gate, abs=5e-4)
+    assert 0 < errs[0] < 1e-3
+    assert abs(fids[0] - f_gate) < 4 * errs[0]
 
 
 def test_lorentzian_width_is_hwhm():
