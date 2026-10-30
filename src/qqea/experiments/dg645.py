@@ -383,7 +383,8 @@ def configure_pump_train(dg: DG645, n_pulses: int = 4, width: float = 500e-9, ga
 class DG645PumpTrain:
     """meas_ctrl settables for a back-to-back pump train (see ``configure_pump_train``): ``.n`` (number of pulses 1..4),
     ``.gap`` (s) and ``.width`` (s) each reprogram the whole train; ``.length`` (get only) is the current train length, to be
-    passed as ``pump_duration`` to ``TWPA_schedule.SNAIL_swap_dg645_sched_TWPA``. ``start`` (s, fixed) delays the whole train after
+    passed as ``pump_duration`` to the lab code's DG645-gated SNAIL swap schedule (``TWPA_schedule.SNAIL_swap_dg645_sched_TWPA``,
+    not part of qqea). ``start`` (s, fixed) delays the whole train after
     the trigger: use it to pad the trigger-to-chip latency up to the 4 ns Qblox grid."""
 
     def __init__(self, dg: DG645, n: int = 4, width: float = 500e-9, gap: float = 16e-9, name: str = "dg645_train", start: float = 0.0):
