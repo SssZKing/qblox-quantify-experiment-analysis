@@ -51,7 +51,7 @@ def iswap_pulsed_pump_schedule(
     Pulsed pump iSWAP repetitive schedule.
 
     ``iswap_spacing`` (seconds, default 0) inserts an idle between consecutive
-    iSWAPs. With 0 the iSWAPs run back to back (26 ns RF gap), a context in
+    iSWAPs. With 0 the iSWAPs run back to back (ISWAP_LEAD RF gap), a context in
     which a pump pulse changes the next iSWAP (2026-10-02: ~28 deg of sum phase
     per pair, fading with ~10 ns and ~80 ns time constants), so the duration
     calibrated here may differ from the one isolated iSWAPs need.
@@ -129,7 +129,7 @@ def iswap_tail_1q_schedule(
 
     ``gap`` (seconds, 4 ns grid) is added on top of the default 16 ns buffer
     between the iSWAP block's RF-off and the X180 pulses. ``pump=False`` replaces
-    every iSWAP block with an idle of ``reference_duration`` (26 ns lead + pulse
+    every iSWAP block with an idle of ``reference_duration`` (ISWAP_LEAD + pulse
     duration), giving the same timing without any pump: the 1Q error floor.
     """
     lengths = np.asarray(lengths, dtype=int)
@@ -138,7 +138,7 @@ def iswap_tail_1q_schedule(
     if len(qubit_names) != 2:
         raise ValueError("iswap_tail_1q_schedule requires two qubits.")
     if not pump and reference_duration is None:
-        raise ValueError("pump=False needs reference_duration (26 ns + iSWAP pulse duration).")
+        raise ValueError("pump=False needs reference_duration (ISWAP_LEAD + iSWAP pulse duration).")
     readout_duration = max_readout_duration(qubits)
     operation_buffer_time = MIN_TIME_BETWEEN_OPERATIONS * 4e-9
 
@@ -192,7 +192,7 @@ def pump_probe_ramsey_schedule(
     difference on - off over ``2 pi window`` is the mean qubit frequency shift
     in ``[delay, delay + window]`` after the X90.
 
-    The pump pulse is placed like the iSWAP's own marker (RF lands 26 ns after
+    The pump pulse is placed like the iSWAP's own marker (RF lands ISWAP_LEAD after
     the reset's ResetClockPhase), and the delay counts from its RF-off.
     ``delays`` and ``window`` are in seconds on the 4 ns grid.
     """
@@ -214,10 +214,10 @@ def pump_probe_ramsey_schedule(
         for qubit_name in qubit_names:
             sched.add(ResetClockPhase(clock=f"{qubit_name}.01"), ref_op=qubit_reset, ref_pt="end")
         if pump:
-            sched.add(MarkerPulse(duration=pump_duration, port="snail:switch"), rel_time=26e-9 - _gates.iSWAP_DELAY)
+            sched.add(MarkerPulse(duration=pump_duration, port="snail:switch"), rel_time=_gates.ISWAP_LEAD - _gates.iSWAP_DELAY)
             sched.add(IdlePulse(duration=_gates.iSWAP_DELAY))
         else:
-            sched.add(IdlePulse(duration=26e-9 + pump_duration))
+            sched.add(IdlePulse(duration=_gates.ISWAP_LEAD + pump_duration))
         if delay > 0:
             sched.add(IdlePulse(duration=delay))
         sched.add(Rxy(theta=90, phi=0, qubit=q))
@@ -257,13 +257,13 @@ def pump_probe_swap_schedule(
     the given duration (0 = none); measure both qubits. The pump frequency and
     power are the generator's own (set outside, e.g. as a meas_ctrl settable), so
     a frequency x duration grid gives a chevron with and without the pre-pulse.
-    Pump pulses are placed like the iSWAP's marker (RF lands 26 ns after the
+    Pump pulses are placed like the iSWAP's marker (RF lands ISWAP_LEAD after the
     previous operation). Times in seconds on the 4 ns grid.
 
     ``excite_before_pre=True`` applies the X180 before the pre-pulse instead of
     after the gap. With a pre-pulse of one iSWAP length the excitation then sits
     on the other qubit when the probe starts, and the gap can be as short as the
-    back-to-back iSWAP spacing (the probe's RF lands ``gap`` + 26 ns after the
+    back-to-back iSWAP spacing (the probe's RF lands ``gap`` + ISWAP_LEAD after the
     pre-pulse's RF-off), which probes the fast part of the tail.
     """
     durations = np.asarray(durations, dtype=float)
@@ -278,7 +278,7 @@ def pump_probe_swap_schedule(
     sched = Schedule("Pump-probe swap", repetitions=repetitions)
 
     def _pump(duration):
-        sched.add(MarkerPulse(duration=duration, port="snail:switch"), rel_time=26e-9 - _gates.iSWAP_DELAY)
+        sched.add(MarkerPulse(duration=duration, port="snail:switch"), rel_time=_gates.ISWAP_LEAD - _gates.iSWAP_DELAY)
         sched.add(IdlePulse(duration=_gates.iSWAP_DELAY))
 
     for acq_idx, dur in enumerate(durations):
@@ -291,7 +291,7 @@ def pump_probe_swap_schedule(
             if pre:
                 _pump(pre_duration)
             else:
-                sched.add(IdlePulse(duration=26e-9 + pre_duration))
+                sched.add(IdlePulse(duration=_gates.ISWAP_LEAD + pre_duration))
         if gap > 0:
             sched.add(IdlePulse(duration=gap))
         if not excite_before_pre:
@@ -580,7 +580,7 @@ def iswap_RPE_theta_sum(
     neighbouring single-qubit pulses.
 
     ``iswap_spacing`` (seconds, multiple of 4 ns) inserts an idle between
-    consecutive iSWAPs of the train (default 0: back to back, 26 ns RF gap).
+    consecutive iSWAPs of the train (default 0: back to back, ISWAP_LEAD RF gap).
     Used to test whether the per-gate phase depends on how close the pump
     pulses are. The idle adds qubit-detuning phase ``360 (df1 + df2) *
     spacing`` per pair, which the caller has to account for.
@@ -772,7 +772,7 @@ def iswap_RPE_d(
                 sched.add(ResetClockPhase(clock=f"{qubit_name}.01"), ref_op=qubit_reset, ref_pt="end")
 
             sched.add(index_to_operation(qubit_names, operation_buffer_time, clifford_gate_idx=3))
-            sched.add(MarkerPulse(duration=sqrt_iswap_duration, port="snail:switch"), rel_time=26e-9-_gates.iSWAP_DELAY)
+            sched.add(MarkerPulse(duration=sqrt_iswap_duration, port="snail:switch"), rel_time=_gates.ISWAP_LEAD - _gates.iSWAP_DELAY)
             sched.add(IdlePulse(duration=_gates.iSWAP_DELAY + _gates.ISWAP_SETTLE))
             sched.add(index_to_operation(qubit_names, operation_buffer_time, clifford_gate_idx=3))
 
@@ -784,7 +784,7 @@ def iswap_RPE_d(
                     sched.add(Rz(qubit=qubit_names[1], theta=theta_q1))
 
             sched.add(index_to_operation(qubit_names, operation_buffer_time, clifford_gate_idx=3))
-            sched.add(MarkerPulse(duration=sqrt_iswap_duration, port="snail:switch"), rel_time=26e-9-_gates.iSWAP_DELAY)
+            sched.add(MarkerPulse(duration=sqrt_iswap_duration, port="snail:switch"), rel_time=_gates.ISWAP_LEAD - _gates.iSWAP_DELAY)
             sched.add(IdlePulse(duration=_gates.iSWAP_DELAY + _gates.ISWAP_SETTLE))
 
             measure_with_twpa(

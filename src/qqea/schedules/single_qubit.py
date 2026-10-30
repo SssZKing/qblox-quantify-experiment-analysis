@@ -2402,3 +2402,115 @@ def cavity_charging(
         schedule.add(IdlePulse(duration=4e-9), label=f"end {i}")
         
     return schedule
+
+
+DG645_PUMP_LATENCY = 128e-9   # Qblox snail:switch rising edge -> pump on the chip; DG645 start delay pads the measured latency to this
+
+
+def SNAIL_swap_dg645_sched(
+    pump_duration: float,
+    qubit_specifier: BasicTransmonElement | Iterable[BasicTransmonElement],
+    qubit_e: BasicTransmonElement | Iterable[BasicTransmonElement],
+    swap_type: Literal['iSWAP', 'bSWAP'] = 'iSWAP',
+    dg_latency: float = DG645_PUMP_LATENCY,
+    pre_pump_buffer: float = 16e-9,
+    post_pump_wait: float = 16e-9,
+    acq_protocol: Literal[
+        "SSBIntegrationComplex", "ThresholdedAcquisition", "NumericalSeparatedWeightedIntegration"
+    ] = "ThresholdedAcquisition",
+    repetitions: int = 1,
+) -> Schedule:
+    """iSWAP/bSWAP shot with the pump gated by an external DG645, not by the Qblox marker length.
+
+    The DG645 sets the pump length (program it before the run, e.g. ``dg645.DG645PumpWidth`` /
+    ``DG645PumpTrain`` as the meas_ctrl settable); ``pump_duration`` is that length (one pulse or the
+    whole train). The ``snail:switch`` marker is the trigger (rising edge) and is given the same length,
+    so the timing table carries the gate: it starts ``dg_latency`` (trigger edge -> pump on the chip,
+    on the 4 ns grid; pad the DG645 start delay to make it exact) before the pump should start. The pump
+    therefore starts exactly ``pre_pump_buffer`` after the preparation gates end, whatever the latency,
+    and Measure starts ``post_pump_wait`` after the pump ends. ``dg_latency`` must not exceed the
+    duration of the preparation plus the buffer (the marker may overlap the preparation; with
+    swap_type 'bSWAP' there is no preparation, so a 4 ns idle anchors the gate after Reset).
+    One acquisition per qubit (acq_index 0): use a non-batched ScheduleGettable.
+    """
+    qubits = [qubit_specifier] if hasattr(qubit_specifier, "name") else list(qubit_specifier)
+    qubit_names = [qubit.name for qubit in qubits]
+    qubit_e = [qubit_e] if hasattr(qubit_e, "name") else list(qubit_e)
+    readout_duration = max_readout_duration(qubits)
+    pump_duration = float(pump_duration)
+
+    schedule = Schedule("SNAIL swap (DG645 gated)", repetitions)
+    reset = schedule.add(Reset(*qubit_names), label="Reset")
+    last = schedule.add(IdlePulse(duration=max(4e-9, dg_latency - pre_pump_buffer + 4e-9)), ref_op=reset, ref_pt="end")
+    if swap_type == 'iSWAP':
+        for qe in qubit_e:
+            last = schedule.add(X(qe.name), ref_op=last, ref_pt="end")
+    gate = schedule.add(IdlePulse(duration=max(pump_duration, 4e-9)), ref_op=last, ref_pt="end", rel_time=pre_pump_buffer,
+                        label="pump on chip")
+    if pump_duration > 0:
+        schedule.add(MarkerPulse(duration=pump_duration, port="snail:switch"), ref_op=gate, ref_pt="start",
+                     rel_time=-dg_latency, label="DG645 trigger")
+    measure_with_twpa(
+        schedule,
+        *qubit_names,
+        readout_duration=readout_duration,
+        acq_index=0,
+        acq_protocol=acq_protocol,
+        ref_op=gate,
+        ref_pt="end",
+        rel_time=post_pump_wait,
+        label="Measurement",
+        marker_label="TWPA_mark",
+    )
+    schedule.add(IdlePulse(duration=4e-9), label="end")
+    return schedule
+
+
+def SNAIL_swap_dg645_timing_sched(
+    probe_time: float,
+    qubit_specifier: BasicTransmonElement | Iterable[BasicTransmonElement],
+    qubit_e: BasicTransmonElement | Iterable[BasicTransmonElement],
+    trigger_lead: float = 600e-9,
+    readout_delay: float = 1.6e-6,
+    trigger_duration: float = 100e-9,
+    acq_protocol: Literal[
+        "SSBIntegrationComplex", "ThresholdedAcquisition", "NumericalSeparatedWeightedIntegration"
+    ] = "ThresholdedAcquisition",
+    repetitions: int = 1,
+) -> Schedule:
+    """Locate the DG645-gated pump window in the Qblox timeline.
+
+    The ``snail:switch`` trigger fires ``trigger_lead`` after Reset; X(qubit_e) is centred at
+    ``probe_time`` relative to the trigger rising edge (negative = before the trigger); Measure starts
+    ``readout_delay`` after the trigger edge. With a fixed DG645 pump window [t_on, t_off] the
+    excitation swaps only for the part of the window after the X pulse, so the swapped population vs
+    ``probe_time`` is flat before t_on, follows the swap curve backwards inside the window and drops
+    to zero at t_off. Requires trigger_lead >= -min(probe_time) + X duration / 2 and
+    readout_delay > max(probe_time) + X duration / 2. Non-batched (acq_index 0).
+    """
+    qubits = [qubit_specifier] if hasattr(qubit_specifier, "name") else list(qubit_specifier)
+    qubit_names = [qubit.name for qubit in qubits]
+    qubit_e = [qubit_e] if hasattr(qubit_e, "name") else list(qubit_e)
+    readout_duration = max_readout_duration(qubits)
+    probe_time = float(probe_time)
+
+    schedule = Schedule("SNAIL swap DG645 timing", repetitions)
+    reset = schedule.add(Reset(*qubit_names), label="Reset")
+    trig = schedule.add(MarkerPulse(duration=trigger_duration, port="snail:switch"), ref_op=reset, ref_pt="end",
+                        rel_time=trigger_lead, label="DG645 trigger")
+    for qe in qubit_e:
+        schedule.add(X(qe.name), ref_op=trig, ref_pt="start", rel_time=probe_time - qe.rxy.duration() / 2)
+    measure_with_twpa(
+        schedule,
+        *qubit_names,
+        readout_duration=readout_duration,
+        acq_index=0,
+        acq_protocol=acq_protocol,
+        ref_op=trig,
+        ref_pt="start",
+        rel_time=readout_delay,
+        label="Measurement",
+        marker_label="TWPA_mark",
+    )
+    schedule.add(IdlePulse(duration=4e-9), label="end")
+    return schedule

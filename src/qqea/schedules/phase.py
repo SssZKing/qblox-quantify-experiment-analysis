@@ -14,6 +14,26 @@ from qqea.schedules import gates as _gates
 PUMP_OFF_DBM = -60.0
 
 
+# Compensation of the extra phase an iSWAP picks up when it closely follows another pump pulse
+# ("context"). Measured 2026-10-09 by state tomography of X90 + N back-to-back iSWAPs: every iSWAP
+# after the first of a back-to-back run carries an extra phase of ~15-20 deg on the excitation it
+# delivers, the same on both qubits and linear in N up to N = 4 (a fast part that is gone once the
+# previous pump pulse is > ~20 ns away, plus a slow ~8 deg part that builds up over >= 2 earlier
+# pulses). An X90 between two iSWAPs acts exactly like an idle of its length, so the context is a
+# function of timing only.
+#
+# None (default) = no compensation. Otherwise a dict:
+#   "max_gap": an iSWAP whose RF starts at most this long after the previous iSWAP's RF ended
+#              continues a back-to-back run (seconds; back to back is ISWAP_LEAD).
+#   "train":   [(phi_q0, phi_q1), ...] in degrees -- extra phase measured on the excitation
+#              arriving on q0 / q1 at the 2nd, 3rd, ... iSWAP of a run (the last entry repeats).
+# The measured phase is SUBTRACTED inside _iswap_rz_corrections' register (like the AC-Stark
+# phase, so the c_q0 <-> c_q1 exchange carries it), only for iSWAPs whose timing is passed in
+# one list -- i.e. the corrections of GST_pre_build. iSWAPs separated by single-qubit layers
+# (gap > max_gap) are not compensated. Read at call time; set qqea.schedules.phase.ISWAP_CONTEXT_PHASE.
+ISWAP_CONTEXT_PHASE = None
+
+
 # Individual per-qubit AC-Stark phase correction (dissertation part 3), applied on every
 # iSWAP occurrence. Unlike parts 1+2 (_detuning_residual), this isn't derived from calibrated
 # f01/pump frequency -- it's a single constant per qubit, measured directly by experiment.
@@ -116,9 +136,52 @@ def _ac_stark_phases(qubits, quantum_device) -> tuple[float, float]:
     return (AC_STARK_PHASE_Q0, AC_STARK_PHASE_Q1)
 
 
+def _iswap_pulse_duration(qubits, quantum_device) -> float:
+    """The iSWAP edge's configured pump pulse duration (s), looked up like
+    ``_ac_stark_phases``."""
+    for edge_name in (f"{qubits[0].name}_{qubits[1].name}", f"{qubits[1].name}_{qubits[0].name}"):
+        try:
+            edge = quantum_device.get_edge(edge_name)
+        except KeyError:
+            continue
+        return float(edge.iswap.pulse_duration())
+    raise ValueError(f"No iSWAP edge found for {qubits[0].name}/{qubits[1].name}.")
+
+
+def iswap_context_phases(
+    t_list: list[float], pulse_duration: float, context: dict | None = None,
+) -> list[tuple[float, float]] | None:
+    """
+    Per-iSWAP context phases ``(phi_q0, phi_q1)`` in degrees for one block's
+    chronological iSWAP times (RF start, seconds since the phase reset, as from
+    ``compute_iswap_t1``), from ``context`` (default: the module-level
+    ``ISWAP_CONTEXT_PHASE``; see there). ``None`` if compensation is off.
+
+    An iSWAP continues a back-to-back run when its RF starts at most
+    ``context["max_gap"]`` after the previous iSWAP's RF ended
+    (``t_k - t_(k-1) - pulse_duration``). The first iSWAP of every run gets
+    (0, 0) -- it is the isolated gate the Stark phases are nulled on -- and the
+    j-th further iSWAP of the run gets ``context["train"][j - 1]`` (the last
+    entry repeats). Only the iSWAPs in ``t_list`` are seen, so a pump pulse that
+    is not in it (warm-up, sqrt-iSWAP) does not start or continue a run.
+    """
+    if context is None:
+        context = ISWAP_CONTEXT_PHASE
+    if not context:
+        return None
+    max_gap, train = float(context["max_gap"]), list(context["train"])
+    out, run = [], 0
+    for k, t in enumerate(t_list):
+        gap = t - t_list[k - 1] - pulse_duration if k > 0 else None
+        run = run + 1 if (gap is not None and gap <= max_gap + 1e-12) else 0
+        out.append((0.0, 0.0) if run == 0 else tuple(float(v) for v in train[min(run, len(train)) - 1]))
+    return out
+
+
 def _iswap_rz_corrections(
     t_list: list[float], detuning_residual: float,
     ac_stark: tuple[float, float] | None = None,
+    context: list[tuple[float, float]] | None = None,
 ) -> list[tuple[float, float]]:
     """
     Turn a chronological list of iSWAP times (seconds since the phase reset)
@@ -156,6 +219,12 @@ def _iswap_rz_corrections(
         ``(phi_AC_q0, phi_AC_q1)`` in degrees. Every schedule builder passes
         the edge's values (``_ac_stark_phases``). ``None`` falls back to the
         module-level ``AC_STARK_PHASE_Q0``/``AC_STARK_PHASE_Q1``.
+    context
+        Optional per-iSWAP ``(phi_q0, phi_q1)`` in degrees, one per entry of
+        ``t_list`` (from ``iswap_context_phases``): the extra phase measured on
+        the excitation arriving on q0 / q1 at that iSWAP because it closely
+        follows another pump pulse. Subtracted in the register next to
+        ``phi_AC``. ``None`` = no context compensation.
 
     Notes
     -----
@@ -175,12 +244,16 @@ def _iswap_rz_corrections(
         ac_stark = (AC_STARK_PHASE_Q0, AC_STARK_PHASE_Q1)
     ac_q0, ac_q1 = ac_stark
 
+    if context is not None and len(context) != len(t_list):
+        raise ValueError(f"context has {len(context)} entries for {len(t_list)} iSWAP times.")
+
     corrections = []
     c_q0, c_q1 = 0.0, 0.0
-    for t in t_list:
+    for k, t in enumerate(t_list):
         residual = 360.0 * detuning_residual * t
-        new_c_q0 = c_q1 - residual + ac_q0
-        new_c_q1 = c_q0 + residual + ac_q1
+        x_q0, x_q1 = context[k] if context is not None else (0.0, 0.0)
+        new_c_q0 = c_q1 - residual + ac_q0 - x_q0
+        new_c_q1 = c_q0 + residual + ac_q1 - x_q1
         corrections.append((new_c_q0 - c_q0, new_c_q1 - c_q1))
         c_q0, c_q1 = new_c_q0, new_c_q1
     return corrections
@@ -235,6 +308,22 @@ def compute_iswap_t1(sched: Schedule, quantum_device) -> list[float]:
     # fires *before* its own block's reset, the gate gets anchored to the
     # previous block, and ``t`` picks up a whole Reset thermalisation.
     t1_list = []
+    dg645 = _gates.ISWAP_DG645
+    if dg645:
+        # DG645 path: each marker triggers a train of k pulses starting `latency` after its edge; k from the
+        # marker length (= train length, see pygsti_circuit_to_operation). One t per pulse.
+        lat, width, gap = (float(dg645[k]) for k in ("latency", "width", "gap"))
+        durations = table.loc[table["port"] == "snail:switch", "duration"].tolist()
+        for t_marker, dur in zip(iswap_times, durations):
+            k = int(round((dur + gap) / (width + gap)))
+            if k < 1 or abs(k * width + (k - 1) * gap - dur) > 1e-12:
+                raise ValueError(f"snail:switch marker of {dur*1e9:.1f} ns is not a train of {width*1e9:.0f} ns pulses "
+                                 f"with {gap*1e9:.0f} ns gaps.")
+            t_rf0 = t_marker + lat
+            preceding_resets = [t for t in reset_times if t <= t_rf0]
+            t_ref = max(preceding_resets) if preceding_resets else 0.0
+            t1_list.extend(t_rf0 + j * (width + gap) - t_ref for j in range(k))
+        iswap_times = []
     for t_marker in iswap_times:
         t_rf = t_marker + _gates.iSWAP_DELAY
         preceding_resets = [t for t in reset_times if t <= t_rf]

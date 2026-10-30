@@ -13,6 +13,12 @@ from qqea.schedules.clifford.clifford_group import (
 
 # iSWAP_DELAY = 38e-9
 iSWAP_DELAY = 120e-9
+# Idle between the end of the previous operation and the pump RF of an iSWAP (the RF lands
+# ISWAP_LEAD after the previous operation; the marker is issued iSWAP_DELAY early for that).
+# Back-to-back iSWAPs are therefore ISWAP_LEAD apart in RF. Was a hardcoded 26 ns until
+# 2026-10-09, then 40 ns. Read at call time, so it can be changed live:
+# set qqea.schedules.gates.ISWAP_LEAD.
+ISWAP_LEAD = 40e-9
 
 
 # Extra idle after every iSWAP (and sqrt-iSWAP) before the next operation, on top of the
@@ -33,6 +39,22 @@ ISWAP_SETTLE = 0.0
 # 100 ns leaves ~2.9 deg/pair (~1.4 deg/gate).
 # Read at call time; change it live through qqea.schedules.gates.ISWAP_CONSECUTIVE_GAP.
 ISWAP_CONSECUTIVE_GAP = 100e-9
+
+
+# DG645-gated pump (SGS100A CW, ALC on, fast switch driven by the DG645 rear OR port; since 2026-10-26).
+# None = the old path: the Qblox marker itself gates the pump, one marker per iSWAP, iSWAP_DELAY early.
+# Otherwise a dict {"latency": s, "width": s, "gap": s}: the snail:switch marker only TRIGGERS the DG645,
+# which then plays a fixed train of k pulses (width, gap) starting `latency` after the marker edge
+# (DG645_PUMP_LATENCY = 128 ns incl. its 2.4 ns start pad). A train cannot be retriggered within its
+# delay cycle, so consecutive Giswap layers (no single-qubit layer between) are merged into ONE marker of
+# the train length (k * width + (k - 1) * gap) and the DG645 must be configured with n = k for that
+# circuit (qqea.experiments.dg645.configure_pump_train / DG645PumpTrain) -- group circuits by
+# gst_iswap_runs(). The Rz corrections of all k gates go right after the train (virtual Z, no pulses
+# inside the train, so this is equivalent), and compute_iswap_t1 expands each marker into the k pulse
+# times. ISWAP_LEAD is the idle between the previous operation and the first pulse's RF (16 ns with the
+# fast switch); ISWAP_CONSECUTIVE_GAP is not used. Only the pyGSTi-circuit (GST) path supports it.
+# Read at call time; set qqea.schedules.gates.ISWAP_DG645.
+ISWAP_DG645 = None
 
 
 class iSWAP(Operation):
@@ -160,7 +182,7 @@ def index_to_operation(
             op = pycqed_operation_map[gate](qubits)
             if op is not None:
                 if gate == 'iSWAP':
-                    subsched.add(op, rel_time=26e-9-iSWAP_DELAY)
+                    subsched.add(op, rel_time=ISWAP_LEAD - iSWAP_DELAY)
                     # The AC-Stark phase (part 3) is NOT applied here as a bare
                     # constant Rz: it is carried in _iswap_rz_corrections'
                     # register so that the iSWAP's c_q0 <-> c_q1 exchange

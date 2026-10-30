@@ -162,10 +162,10 @@ def _tomo_build(cfg, operation_state_idx, acq_protocol, bin_mode, repetitions,
             if cfg["warmup_duration"] is None:
                 sched.add(index_to_operation(qubit_names, operation_buffer_time, clifford_gate_idx=5760))
             else:
-                # same placement as the iSWAP in index_to_operation: RF lands 26 ns after
+                # same placement as the iSWAP in index_to_operation: RF lands ISWAP_LEAD after
                 # the previous operation, followed by the RF-off wait
                 sched.add(MarkerPulse(duration=cfg["warmup_duration"], port="snail:switch"),
-                          rel_time=26e-9 - _gates.iSWAP_DELAY)
+                          rel_time=_gates.ISWAP_LEAD - _gates.iSWAP_DELAY)
                 sched.add(IdlePulse(duration=_gates.iSWAP_DELAY + _gates.ISWAP_SETTLE))
         if cfg["warmup_gap"] > 0:
             sched.add(IdlePulse(duration=cfg["warmup_gap"]))

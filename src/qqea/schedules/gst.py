@@ -12,6 +12,7 @@ from quantify_scheduler.operations import (
     X90,
     Y90,
     IdlePulse,
+    MarkerPulse,
     Reset,
     ResetClockPhase,
     Rxy,
@@ -21,12 +22,15 @@ from quantify_scheduler.operations import (
 )
 
 from qqea.schedules import gates as _gates
+from qqea.schedules import phase as _phase
 from qqea.schedules.gates import iSWAP
 from qqea.schedules.phase import (
     _ac_stark_phases,
     _detuning_residual,
+    _iswap_pulse_duration,
     _iswap_rz_corrections,
     compute_iswap_t1,
+    iswap_context_phases,
 )
 from qqea.schedules.twpa import max_readout_duration, measure_with_twpa
 
@@ -259,8 +263,11 @@ def pygsti_circuit_to_operation(
     ref_ops = [ref_op, ref_op]
     # True while the last emitted layer was an iSWAP with no single-qubit layer since.
     prev_layer_iswap = False
+    # DG645 path: length of the back-to-back iSWAP run starting at each decomposition entry (0 = not a run start).
+    dg645 = _gates.ISWAP_DG645
+    run_start_len = _iswap_run_starts(gate_decomp) if dg645 else None
 
-    for qubits, gates in gate_decomp:
+    for i_entry, (qubits, gates) in enumerate(gate_decomp):
         if len(qubits) == 0:
             if len(qubit_names) == 1:
                 qubits = ("q0",)
@@ -277,10 +284,27 @@ def pygsti_circuit_to_operation(
                 raise ValueError(f"Unsupported gate in decomposition: {gate}")
             op = pycqed_operation_map[gate](qubits)
             if op is not None:
-                if gate == 'iSWAP':
+                if gate == 'iSWAP' and dg645:
+                    # One DG645 trigger per back-to-back run: the run's first layer carries the marker (train
+                    # length, `latency` early) and the idle up to the train's end; later layers of the run add
+                    # nothing. The run's k register corrections (one per gate, from GST_pre_build) are summed into
+                    # ONE Rz pair after the train: virtual Zs with no pulse between them just add, and the NCO
+                    # needs >= 4 ns between phase updates, so they cannot be k separate pairs at the same instant.
+                    k = run_start_len[i_entry]
+                    if k:
+                        lat, width, gap = (float(dg645[x]) for x in ("latency", "width", "gap"))
+                        train = k * width + (k - 1) * gap
+                        subsched.add(MarkerPulse(duration=train, port="snail:switch"),
+                                     rel_time=_gates.ISWAP_LEAD - lat)
+                        subsched.add(IdlePulse(duration=lat))
+                        if iswap_phase_iter is not None:
+                            pairs = [next(iswap_phase_iter) for _ in range(k)]
+                            subsched.add(Rz(qubit=qubit_names[0], theta=float(sum(p[0] for p in pairs))))
+                            subsched.add(Rz(qubit=qubit_names[1], theta=float(sum(p[1] for p in pairs))))
+                elif gate == 'iSWAP':
                     if prev_layer_iswap and _gates.ISWAP_CONSECUTIVE_GAP > 0:
                         subsched.add(IdlePulse(duration=_gates.ISWAP_CONSECUTIVE_GAP))
-                    subsched.add(op, rel_time=26e-9-_gates.iSWAP_DELAY)
+                    subsched.add(op, rel_time=_gates.ISWAP_LEAD - _gates.iSWAP_DELAY)
                     subsched.add(IdlePulse(duration=_gates.iSWAP_DELAY + _gates.ISWAP_SETTLE))
                     # Address the pair by qubit_names, NOT by qubits[0]/[1]: the
                     # latter follows the gate label's argument order, so a
@@ -320,6 +344,34 @@ def pygsti_circuit_to_operation(
     if len(gate_sched.operations) == 1:
         return None
     return gate_sched
+
+
+def _is_iswap_entry(qubits, gates) -> bool:
+    return len(qubits) == 2 and "iSWAP" in gates
+
+
+def _iswap_run_starts(gate_decomp) -> list[int]:
+    """For each entry of a ``pygsti_circuit_to_gate_decomposition`` list: the number of back-to-back iSWAP
+    layers starting there if it begins a run (no single-qubit entry between consecutive iSWAP entries),
+    else 0."""
+    out, i = [0] * len(gate_decomp), 0
+    while i < len(gate_decomp):
+        if _is_iswap_entry(*gate_decomp[i]):
+            j = i
+            while j < len(gate_decomp) and _is_iswap_entry(*gate_decomp[j]):
+                j += 1
+            out[i] = j - i
+            i = j
+        else:
+            i += 1
+    return out
+
+
+def gst_iswap_runs(pygsti_circuit) -> list[int]:
+    """Lengths of the back-to-back iSWAP runs of a pyGSTi circuit, in order (empty if it has no iSWAP).
+    With the DG645 path (``qqea.schedules.gates.ISWAP_DG645``) each run is one trigger of a k-pulse train,
+    so a schedule may only hold circuits whose runs all have the length the DG645 is configured for."""
+    return [k for k in _iswap_run_starts(pygsti_circuit_to_gate_decomposition(pygsti_circuit)) if k]
 
 
 def _gst_setup(qubit_specifier, experiment_list):
@@ -482,13 +534,18 @@ def GST_pre_build(
             f"circuits), found {len(t1_list)}."
         )
 
+    # Context compensation for iSWAPs that closely follow another (ISWAP_CONTEXT_PHASE; off when None).
+    pulse_duration = (_iswap_pulse_duration(cfg["qubits"], quantum_device)
+                      if _phase.ISWAP_CONTEXT_PHASE else None)
+
     corrections = []
     pos = 0
     for n_iswap in cfg["n_iswap_per_circuit"]:
         if n_iswap == 0:
             continue
         block_t1 = t1_list[pos:pos + n_iswap]
-        corrections.extend(_iswap_rz_corrections(block_t1, detuning_residual, ac_stark))
+        context = iswap_context_phases(block_t1, pulse_duration) if pulse_duration is not None else None
+        corrections.extend(_iswap_rz_corrections(block_t1, detuning_residual, ac_stark, context))
         pos += n_iswap
 
     return np.array(corrections)

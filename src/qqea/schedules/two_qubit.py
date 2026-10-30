@@ -11,6 +11,8 @@ from __future__ import annotations
 from qqea.fitting.rb import RBAnalysis
 from qqea.schedules.gates import (
     ISWAP_CONSECUTIVE_GAP,
+    ISWAP_DG645,
+    ISWAP_LEAD,
     ISWAP_SETTLE,
     index_to_operation,
     iSWAP,
@@ -19,6 +21,7 @@ from qqea.schedules.gates import (
 from qqea.schedules.gst import (
     GST_pre_build,
     GST_schedule,
+    gst_iswap_runs,
     pygsti_circuit_to_gate_decomposition,
     pygsti_circuit_to_operation,
 )
@@ -36,8 +39,10 @@ from qqea.schedules.iswap import (
 from qqea.schedules.phase import (
     AC_STARK_PHASE_Q0,
     AC_STARK_PHASE_Q1,
+    ISWAP_CONTEXT_PHASE,
     PUMP_OFF_DBM,
     compute_iswap_t1,
+    iswap_context_phases,
 )
 from qqea.schedules.rb import (
     randomized_benchmarking_schedule,
@@ -54,12 +59,16 @@ __all__ = [
     "iSWAP_DELAY",
     "ISWAP_SETTLE",
     "ISWAP_CONSECUTIVE_GAP",
+    "ISWAP_LEAD",
+    "ISWAP_DG645",
     "iSWAP",
     "index_to_operation",
     "PUMP_OFF_DBM",
     "AC_STARK_PHASE_Q0",
     "AC_STARK_PHASE_Q1",
+    "ISWAP_CONTEXT_PHASE",
     "compute_iswap_t1",
+    "iswap_context_phases",
     "randomized_benchmarking_schedule",
     "simultaneous_randomized_benchmarking_schedule",
     "iswap_pulsed_pump_schedule",
@@ -79,5 +88,6 @@ __all__ = [
     "pygsti_circuit_to_operation",
     "GST_pre_build",
     "GST_schedule",
+    "gst_iswap_runs",
     "RBAnalysis",
 ]
