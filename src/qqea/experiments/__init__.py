@@ -9,6 +9,7 @@ which themselves import ``qqea.schedules``.
 _EXPORTS = {
     "CalibrationNodes": "qqea.experiments.calibration_nodes",
     "HP83732B": "qqea.experiments.hp83732b",
+    "DG645": "qqea.experiments.dg645",
     "set_datadir_from_env": "qqea.experiments.datadir",
     "save_retrieve_acquisition_dataset": "qqea.experiments.saving",
 }
