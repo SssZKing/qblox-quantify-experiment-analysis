@@ -27,6 +27,7 @@ src/qqea/
         saving.py                 save raw retrieve_acquisition() data as a quantify dataset
         datadir.py                set_datadir_from_env(): data directory from QBLOX_DATADIR
         hp83732b.py               qcodes driver for the HP 83732B signal generator (TWPA pump)
+        dg645.py                  qcodes driver for the SRS DG645 delay generator (gated SNAIL pump)
         simulated_data.py         simulated datasets for dry runs
         dry_run.py                run the nodes on a dummy cluster (qblox_dev only)
     fitting/                      analysis: fitting and plotting
@@ -69,6 +70,7 @@ Old imports map to new ones as follows:
 | `pycqed_randomized_benchmarking.clifford_group` | `qqea.schedules.clifford.clifford_group` |
 | `calibration_nodes` | `qqea.experiments.calibration_nodes` |
 | `HP83732B` | `qqea.experiments.hp83732b` |
+| `DG645` | `qqea.experiments.dg645` |
 | `simulated_data` | `qqea.experiments.simulated_data` |
 | `helpers` | `qqea.fitting.fits` |
 | `analyzer` | `qqea.fitting.models` |
